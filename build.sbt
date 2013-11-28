@@ -18,10 +18,10 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-	"com.typesafe.play" %% "play-json" % "2.2.0",
+  "com.typesafe.play" %% "play-json" % "2.2.0",
   "net.databinder.dispatch" %% "dispatch-core" % "0.11.0" % "compile",
   "com.google.android" % "android" % "4.1.1.4" % "compile",
   "com.loopj.android" % "android-async-http" % "1.4.4" % "compile",
-	"org.scala-lang.modules" %% "scala-async" % "0.9.0-M4",
+  "org.scala-lang.modules" %% "scala-async" % "0.9.0-M4",
   "org.scalatest" %% "scalatest" % "2.0" % "test"
 )
