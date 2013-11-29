@@ -7,6 +7,10 @@ case class Unfulfilled[A](need: Need[A]) extends Throwable {
   override def toString = s"Could not fulfill $need"
 }
 
+object Need {
+  type Probe[A] = PartialFunction[Endpoint, Future[A]]
+}
+
 trait Need[A] {
   /** Fulfill the need using the default endpoints */
   def fulfill(implicit ec: ExecutionContext): Future[A] = fulfill(Nil)
@@ -33,7 +37,7 @@ trait Need[A] {
   /** Try to fulfill the need from a given endpoint
     * @param endpoints Current endpoints (to be passed to child needs)
     */
-  def probe(endpoints: List[Endpoint])(implicit ec: ExecutionContext): PartialFunction[Endpoint, Future[A]]
+  def probe(endpoints: List[Endpoint])(implicit ec: ExecutionContext): Need.Probe[A]
 
   /** Endpoints to be used if nothing is found */
   val default: List[Endpoint]

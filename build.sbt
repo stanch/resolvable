@@ -8,6 +8,8 @@ scalaVersion := "2.10.3"
 
 autoCompilerPlugins := true
 
+scalacOptions += "-Ydebug"
+
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots")
 )
