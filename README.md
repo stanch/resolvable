@@ -79,15 +79,14 @@ object Book {
 
 /* Endpoints */
 
-case class BookEndpoint(id: String) extends rest.SingleResourceEndpoint {
-  val path = "/webservice/api/books"
-  def client(url: String): Future[JsValue] = ??? // plug your favorite http client here
-}
+// baking in some conventions and an http client
+abstract class SingleResource(val path: String)
+  extends rest.SingleResourceEndpoint
+  with rest.DispatchClient
 
-case class AuthorEndpoint(id: String) extends rest.SingleResourceEndpoint {
-  val path = "/webservice/api/authors"
-  def client(url: String): Future[JsValue] = ??? // ditto
-}
+case class BookEndpoint(id: String) extends SingleResource("/webservice/api/books")
+
+case class AuthorEndpoint(id: String) extends SingleResource("/webservice/api/authors")
 
 trait AvatarEndpoint {
   type Data = File
@@ -95,11 +94,11 @@ trait AvatarEndpoint {
 }
 
 case class CachedAvatar(url: String) extends AvatarEndpoint {
-  val data: Future[File] = ??? // read file from disk
+  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // read file from disk
 }
 
 case class RemoteAvatar(url: String) extends AvatarEndpoint {
-  val data: Future[File] = ??? // download file from the net and cache it
+  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // download file from the net and cache it
 }
 
 /* Needs */
@@ -111,7 +110,7 @@ case class NeedBook(id: String) extends Need[Book] {
   // try to load from a single endpoint
   // `points` represent already utilized endpoints
   def probe(points: List[Endpoint])(implicit ec: ExecutionContext): Future[Book] = {
-    case e @ BookEndpoint(i) if i == id ⇒ e.readAsync(Book.reads(poitns))
+    case e @ BookEndpoint(i) if i == id ⇒ e.readAsync(Book.reads(points))
     // put other endpoints here
   }
 }
