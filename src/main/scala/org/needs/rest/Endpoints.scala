@@ -1,11 +1,11 @@
 package org.needs.rest
 
 import org.needs.json.JsonEndpoint
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 
 trait RestEndpoint extends JsonEndpoint {
-  def client(url: String): Future[JsValue]
+  def client(url: String)(implicit ec: ExecutionContext): Future[JsValue]
 }
 
 trait HasId {
@@ -14,7 +14,7 @@ trait HasId {
 
 trait SingleResourceEndpoint extends RestEndpoint with HasId {
   val path: String
-  lazy val data = client(s"$path/$id")
+  def fetch(implicit ec: ExecutionContext) = client(s"$path/$id")
 }
 
 trait HasIds {
@@ -23,5 +23,5 @@ trait HasIds {
 
 trait MultipleResourceEndpoint extends RestEndpoint with HasIds {
   val path: String
-  lazy val data = client(s"$path/${ids.mkString(",")}")
+  def fetch(implicit ec: ExecutionContext) = client(s"$path/${ids.mkString(",")}")
 }

@@ -24,19 +24,17 @@ object Story {
 
 /* Endpoints */
 
-abstract class DispatchSingleResource(val path: String) extends rest.SingleResourceEndpoint with rest.DispatchClient {
-  implicit val ec = ExecutionContext.Implicits.global
-}
+abstract class DispatchSingleResource(val path: String) extends rest.SingleResourceEndpoint with rest.DispatchClient
 
 trait SingleAuthorEndpoint extends json.JsonEndpoint with rest.HasId
 case class LocalAuthor(id: String) extends SingleAuthorEndpoint {
-  lazy val data = Future.failed[JsValue](new Exception)
+  def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
 }
 case class RemoteAuthor(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/authors") with SingleAuthorEndpoint
 
 trait SingleStoryEndpoint extends json.JsonEndpoint with rest.HasId
 case class LocalStory(id: String) extends SingleStoryEndpoint {
-  lazy val data = Future.failed[JsValue](new Exception)
+  def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
 }
 case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories") with SingleStoryEndpoint
 

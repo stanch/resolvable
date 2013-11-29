@@ -1,8 +1,8 @@
 package org.needs.rest
 
 import play.api.libs.json._
-import scala.concurrent.Promise
-import scala.util.{Try, Success, Failure}
+import scala.concurrent.{ExecutionContext, Promise}
+import scala.util.{Try, Failure}
 import com.loopj.android.http.{AsyncHttpResponseHandler, AsyncHttpClient}
 
 case class JsonHandler(promise: Promise[JsValue]) extends AsyncHttpResponseHandler {
@@ -16,7 +16,7 @@ case class JsonHandler(promise: Promise[JsValue]) extends AsyncHttpResponseHandl
 
 trait AndroidClient { self: RestEndpoint ⇒
   val asyncHttpClient: AsyncHttpClient
-  def client(url: String) = {
+  def client(url: String)(implicit ec: ExecutionContext) = {
     val promise = Promise[JsValue]()
     asyncHttpClient.get(url, JsonHandler(promise))
     promise.future

@@ -1,11 +1,18 @@
 package org.needs
 
 import scala.concurrent.{ExecutionContext, Future}
-import play.api.libs.json._
 
 trait Endpoint { self ⇒
   type Data
-  val data: Future[Data]
+  protected def fetch(implicit ec: ExecutionContext): Future[Data]
+
+  // if not for the ExecutionContext implicit,
+  // `data` would be a lazy val
+  final private var _fetched: Option[Future[Data]] = None
+  final def data(implicit ec: ExecutionContext) = _fetched.synchronized {
+    if (_fetched.isEmpty) _fetched = Some(fetch)
+    _fetched.get
+  }
 }
 
 trait EndpointOps {
