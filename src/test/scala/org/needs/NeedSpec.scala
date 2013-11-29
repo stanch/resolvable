@@ -1,10 +1,11 @@
 package org.needs
 
+import scala.language.postfixOps
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.scalatest.FlatSpec
-import org.needs.json.Async._
+import org.needs.json._
 
 /* Data model */
 
@@ -15,48 +16,53 @@ object Author {
 
 case class Story(id: String, name: String, author: Author)
 object Story {
-  implicit def reads(implicit ec: ExecutionContext): FulfillableReads[Story] = points ⇒ (
+  implicit val reads = (
     (__ \ '_id).read[String] and
     (__ \ 'meta \ 'title).read[String] and
     (__ \ 'authorId).read[String].map(NeedAuthor)
-  ).tupled.fulfillAll(points).mapAsync(Story.apply _ tupled)
+  ).tupled.liftAll[Fulfillable].fmap(Story.apply _ tupled)
 }
 
 /* Endpoints */
 
-abstract class DispatchSingleResource(val path: String) extends rest.SingleResourceEndpoint with rest.DispatchClient
+abstract class DispatchSingleResource(val path: String)
+  extends rest.SingleResourceEndpoint
+  with rest.DispatchClient
 
-trait SingleAuthorEndpoint extends json.JsonEndpoint with rest.HasId
-case class LocalAuthor(id: String) extends SingleAuthorEndpoint {
+abstract class LocalSingleResource
+  extends json.JsonEndpoint
+  with rest.HasId {
+
   def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
 }
-case class RemoteAuthor(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/authors") with SingleAuthorEndpoint
 
-trait SingleStoryEndpoint extends json.JsonEndpoint with rest.HasId
-case class LocalStory(id: String) extends SingleStoryEndpoint {
-  def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
-}
-case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories") with SingleStoryEndpoint
+case class LocalAuthor(id: String) extends LocalSingleResource
+case class RemoteAuthor(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/authors")
+
+case class LocalStory(id: String) extends LocalSingleResource
+case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories")
 
 /* Needs */
 
 case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
   val default = LocalAuthor(id) orElse RemoteAuthor(id)
-  def probe(points: List[Endpoint])(implicit ec: ExecutionContext) =
-    probeRest[RemoteAuthor]
+
+  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
+    case e @ RemoteAuthor(i) if i == id ⇒ e.as[Author]
+  }
 }
 
 case class NeedStory(id: String) extends Need[Story] with rest.RestNeed[Story] {
   val default = LocalStory(id) orElse RemoteStory(id)
-  def probe(points: List[Endpoint])(implicit ec: ExecutionContext) =
-    probeRestAsync[RemoteStory](points)
+
+  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
+    case e @ RemoteStory(i) if i == id ⇒ e.as[Story]
+  }
 }
 
 class NeedsSpec extends FlatSpec {
   it should "do smth" in {
     import scala.concurrent.ExecutionContext.Implicits.global
-    NeedStory("story-DLMwDHAyDknJxvidn4G6pA").fulfill onComplete { a ⇒
-      println(a)
-    }
+    NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
   }
 }
