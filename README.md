@@ -57,7 +57,6 @@ import org.needs._
 /* Deserialization (see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators) */
 
 object Author {
-  // `points` will be a current set of utilized endpoints
   implicit val reads = (
     (__ \ 'id).read[String] and
     (__ \ 'name).read[String] and
