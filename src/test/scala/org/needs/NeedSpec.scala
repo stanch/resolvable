@@ -89,32 +89,29 @@ case class RemoteStory(id: String) extends DispatchSingleResource("http://routes
 
 /* Needs */
 
-case class NeedAuthor(id: String) extends Need[Author] {
+case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
   use { LocalAuthor(id) }
   use { RemoteAuthor(id) }
-
   from {
-    case e @ RemoteAuthor(i) if i == id ⇒ e.asFulfillable[Author]
+    singleResource[RemoteAuthor]
   }
 }
 
-case class NeedStory(id: String) extends Need[Story] {
+case class NeedStory(id: String) extends Need[Story] with rest.RestNeed[Story] {
   use { LocalStory(id) }
   use { RemoteStory(id) }
-
   from {
-    case e @ RemoteStory(i) if i == id ⇒ e.asFulfillable[Story]
+    singleResource[RemoteStory]
   }
 }
 
-case object NeedLatest extends Need[Latest] with rest.RestEndpoint with rest.DispatchClient {
-  protected def fetch(implicit ec: ExecutionContext) =
+case object NeedLatest extends Need[Latest] with rest.RestEndpoint with rest.DispatchClient { Self ⇒
+  def fetch(implicit ec: ExecutionContext) =
     client("http://routestory.herokuapp.com/api/stories/latest")
 
-  use { this }
-
+  use { Self }
   from {
-    case x if x == this ⇒ asFulfillable[Latest]
+    case Self ⇒ asFulfillable[Latest]
   }
 }
 
