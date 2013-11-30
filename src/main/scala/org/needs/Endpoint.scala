@@ -21,11 +21,13 @@ trait Endpoint extends Ordered[Endpoint] {
 
   final def isFetched = _fetched.synchronized(_fetched.isDefined)
   final private var _fetched: Option[Future[Data]] = None
-  final def data(implicit ec: ExecutionContext) = _fetched.synchronized {
+  final protected def data(implicit ec: ExecutionContext) = _fetched.synchronized {
     if (_fetched.isEmpty) {
       println(s"downloading $this")
       _fetched = Some(fetch)
     }
     _fetched.get
   }
+
+  def asFulfillable = Fulfillable.fromFuture(implicit ec ⇒ data)
 }

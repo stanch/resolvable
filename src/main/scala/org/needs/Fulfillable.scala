@@ -18,7 +18,13 @@ object Fulfillable {
   @implicitNotFound("No optimizer found in scope. You can import the basic one from Optimizers.Implicits.blank")
   type Optimizer = TreeSet[Endpoint] ⇒ Future[TreeSet[Endpoint]]
 
-  def fromFuture[A](in: ExecutionContext ⇒ Future[Fulfillable[A]]) = new Fulfillable[A] {
+  def fromFuture[A](in: ExecutionContext ⇒ Future[A]) = new Fulfillable[A] {
+    def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
+      Future.successful(endpoints)
+    def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = in(ec)
+  }
+
+  def fromFutureFulfillable[A](in: ExecutionContext ⇒ Future[Fulfillable[A]]) = new Fulfillable[A] {
     def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
       Future.successful(endpoints)
     def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =

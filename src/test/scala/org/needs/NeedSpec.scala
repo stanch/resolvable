@@ -94,7 +94,7 @@ case class NeedAuthor(id: String) extends Need[Author] {
   use { RemoteAuthor(id) }
 
   from {
-    case e @ RemoteAuthor(i) if i == id ⇒ e.as[Author]
+    case e @ RemoteAuthor(i) if i == id ⇒ e.asFulfillable[Author]
   }
 }
 
@@ -103,7 +103,7 @@ case class NeedStory(id: String) extends Need[Story] {
   use { RemoteStory(id) }
 
   from {
-    case e @ RemoteStory(i) if i == id ⇒ e.as[Story]
+    case e @ RemoteStory(i) if i == id ⇒ e.asFulfillable[Story]
   }
 }
 
@@ -114,7 +114,7 @@ case object NeedLatest extends Need[Latest] with rest.RestEndpoint with rest.Dis
   use { this }
 
   from {
-    case x if x == this ⇒ as[Latest]
+    case x if x == this ⇒ asFulfillable[Latest]
   }
 }
 
