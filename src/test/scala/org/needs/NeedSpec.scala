@@ -9,6 +9,20 @@ import org.needs.json._
 
 /* Data model */
 
+object Optimizer {
+  import ExecutionContext.Implicits.global
+  implicit val o = /*Optimizers.basic +*/ { pts: List[Endpoint] ⇒
+    println(s"Trying to optimize $pts...")
+    val add = RemoteAuthors(pts.foldLeft(List.empty[String]) {
+      case (ids, RemoteAuthor(id)) ⇒ id :: ids
+      case (ids, _) ⇒ ids
+    }.toSet)
+    Future.successful(add :: pts)
+  }
+}
+
+import Optimizer._
+
 case class Author(id: String, name: String)
 object Author {
   implicit val reads = (
@@ -39,7 +53,7 @@ case class Latest(totalRows: Int, stories: List[StoryPreview])
 object Latest {
   implicit val reads = (
     (__ \ 'total_rows).read[Int] and
-    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(xs ⇒ Fulfillable.sequence(xs, Some(Optimizer.o)))
+    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(Fulfillable.sequence)
   ).tupled.liftAll[Fulfillable].fmap(Latest.apply _ tupled)
 }
 
@@ -97,17 +111,6 @@ case object NeedLatest extends Need[Latest] with rest.RestEndpoint with rest.Dis
 
   def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
     case x if x == this ⇒ as[Latest]
-  }
-}
-
-object Optimizer {
-  val o = { pts: List[Endpoint] ⇒
-    println(s"Trying to optimize $pts...")
-    val add = RemoteAuthors(pts.foldLeft(List.empty[String]) {
-      case (ids, RemoteAuthor(id)) ⇒ id :: ids
-      case (ids, _) ⇒ ids
-    }.toSet)
-    Future.successful(add :: pts)
   }
 }
 
