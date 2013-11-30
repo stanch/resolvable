@@ -53,6 +53,7 @@ Why is this not a good idea? It mixes 3 things into one:
 ```scala
 import play.api.libs.json._
 import org.needs._
+import org.needs.json._
 
 /* Deserialization (see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators) */
 
@@ -94,6 +95,7 @@ trait AvatarEndpoint {
 
 case class CachedAvatar(url: String) extends AvatarEndpoint {
   def fetch(implicit ec: ExecutionContext): Future[File] = ??? // read file from disk
+  override val priority = 1 // try before RemoteAvatar
 }
 
 case class RemoteAvatar(url: String) extends AvatarEndpoint {
@@ -103,28 +105,26 @@ case class RemoteAvatar(url: String) extends AvatarEndpoint {
 /* Needs */
 
 case class NeedBook(id: String) extends Need[Book] {
-  // default endpoints
-  val default = BookEndpoint(id)
+  // list endpoints
+  use { BookEndpoint(id) }
   
-  // try to load from a single endpoint
-  // `endpoints` represent already utilized endpoints
-  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
-    case e @ BookEndpoint(i) if i == id ⇒ e.as[Book]
-    // put other endpoints here
+  // describe how to load from them
+  from {
+    case e @ BookEndpoint(i) if i == id ⇒ e.asFulfillable[Book]
   }
 }
 
 case class NeedAuthor(id: String) extends Need[Author] {
-  val default = AuthorEndpoint(id)
-  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
-    case e @ AuthorEndpoint(i) if i == id ⇒ e.as[Author]
+  use { AuthorEndpoint(id) }
+  from {
+    case e @ AuthorEndpoint(i) if i == id ⇒ e.asFulfillable[Author]
   }
 }
 
 case class NeedAvatar(url: String) extends Need[File] {
-  val default = CachedAvatar(url) orElse RemoteAvatar(url)
-  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
-    case e: AvatarEndpoint if e.url == url ⇒ e.data
+  use(CachedAvatar(url), RemoteAvatar(url))
+  from {
+    case e: AvatarEndpoint if e.url == url ⇒ e.asFulfillable
   }
 }
 
