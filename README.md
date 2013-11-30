@@ -104,26 +104,28 @@ case class RemoteAvatar(url: String) extends AvatarEndpoint {
 
 /* Needs */
 
-case class NeedBook(id: String) extends Need[Book] {
+case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   // list endpoints
   use { BookEndpoint(id) }
   
   // describe how to load from them
   from {
-    case e @ BookEndpoint(i) if i == id ⇒ e.asFulfillable[Book]
+    singleResource[RemoteBook]
   }
 }
 
 case class NeedAuthor(id: String) extends Need[Author] {
   use { AuthorEndpoint(id) }
   from {
-    case e @ AuthorEndpoint(i) if i == id ⇒ e.asFulfillable[Author]
+    singleResource[RemoteAuthor]
   }
 }
 
 case class NeedAvatar(url: String) extends Need[File] {
   use(CachedAvatar(url), RemoteAvatar(url))
   from {
+    // here we don’t use the REST sugar as above
+    // but there will be some sweet File support in the future
     case e: AvatarEndpoint if e.url == url ⇒ e.asFulfillable
   }
 }
