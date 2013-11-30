@@ -110,14 +110,14 @@ case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   
   // describe how to load from them
   from {
-    singleResource[RemoteBook]
+    singleResource[BookEndpoint]
   }
 }
 
 case class NeedAuthor(id: String) extends Need[Author] {
   use { AuthorEndpoint(id) }
   from {
-    singleResource[RemoteAuthor]
+    singleResource[AuthorEndpoint]
   }
 }
 
