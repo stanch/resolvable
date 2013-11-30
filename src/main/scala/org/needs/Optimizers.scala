@@ -4,10 +4,10 @@ import org.needs.Fulfillable.Optimizer
 import scala.concurrent.{ExecutionContext, Future}
 
 object Optimizers {
-  val basic: Optimizer = endpoints ⇒ Future.successful(endpoints.sortBy(!_.isFetched))
+  val blank: Optimizer = endpoints ⇒ Future.successful(endpoints)
 
   object Implicits {
-    implicit val basic = Optimizers.basic
+    implicit val blank = Optimizers.blank
   }
 }
 

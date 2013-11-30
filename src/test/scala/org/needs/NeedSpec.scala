@@ -6,22 +6,26 @@ import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.scalatest.FlatSpec
 import org.needs.json._
+import scala.collection.immutable.TreeSet
 
 /* Data model */
 
-object Optimizer {
-  import ExecutionContext.Implicits.global
-  implicit val o = /*Optimizers.basic +*/ { pts: List[Endpoint] ⇒
-    println(s"Trying to optimize $pts...")
-    val add = RemoteAuthors(pts.foldLeft(List.empty[String]) {
-      case (ids, RemoteAuthor(id)) ⇒ id :: ids
-      case (ids, _) ⇒ ids
-    }.toSet)
-    Future.successful(add :: pts)
-  }
-}
+//object Optimizer {
+//  implicit val o = { endpoints: TreeSet[Endpoint] ⇒
+//    val (add, p) = endpoints.foldLeft((List.empty[String], List.empty[Endpoint])) {
+//      case ((ids, pts), RemoteAuthor(id)) ⇒ (id :: ids, pts)
+//      case ((ids, pts), RemoteAuthors(i)) ⇒ (i.toList ::: ids, pts)
+//      case ((ids, pts), pt) ⇒ (ids, pts ::: pt :: Nil)
+//    }
+//    Future.successful(add match {
+//      case x :: Nil ⇒ RemoteAuthor(x) :: p
+//      case x :: _ ⇒ RemoteAuthors(add.toSet) :: p
+//      case _ ⇒ p
+//    })
+//  }
+//}
 
-import Optimizer._
+import org.needs.Optimizers.Implicits.blank
 
 case class Author(id: String, name: String)
 object Author {
@@ -74,31 +78,31 @@ abstract class LocalSingleResource
   def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
 }
 
-case class LocalAuthor(id: String) extends LocalSingleResource
+trait Local { self: Endpoint ⇒ override val priority = 1 }
+
+case class LocalAuthor(id: String) extends LocalSingleResource with Local
 case class RemoteAuthor(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/authors")
 case class RemoteAuthors(ids: Set[String]) extends DispatchMultipleResource("http://routestory.herokuapp.com/api/authors")
 
-case class LocalStory(id: String) extends LocalSingleResource
+case class LocalStory(id: String) extends LocalSingleResource with Local
 case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories")
 
 /* Needs */
 
 case class NeedAuthor(id: String) extends Need[Author] {
-  val default = LocalAuthor(id) orElse RemoteAuthor(id)
+  use { LocalAuthor(id) }
+  use { RemoteAuthor(id) }
 
-  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
+  from {
     case e @ RemoteAuthor(i) if i == id ⇒ e.as[Author]
-    case e @ RemoteAuthors(ids) if ids contains id ⇒
-      val f = e.as[List[Author]].map(_.find(_.id == id).get)
-      f onFailure { case t ⇒ t.printStackTrace() }
-      f
   }
 }
 
 case class NeedStory(id: String) extends Need[Story] {
-  val default = LocalStory(id) orElse RemoteStory(id)
+  use { LocalStory(id) }
+  use { RemoteStory(id) }
 
-  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
+  from {
     case e @ RemoteStory(i) if i == id ⇒ e.as[Story]
   }
 }
@@ -107,9 +111,9 @@ case object NeedLatest extends Need[Latest] with rest.RestEndpoint with rest.Dis
   protected def fetch(implicit ec: ExecutionContext) =
     client("http://routestory.herokuapp.com/api/stories/latest")
 
-  val default = this :: Nil
+  use { this }
 
-  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
+  from {
     case x if x == this ⇒ as[Latest]
   }
 }

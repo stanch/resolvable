@@ -1,3 +1,3 @@
 package org
 
-package object needs extends EndpointOps with OptimizerOps
+package object needs extends OptimizerOps

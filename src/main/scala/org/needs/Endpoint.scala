@@ -2,9 +2,22 @@ package org.needs
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait Endpoint { self ⇒
+trait Endpoint extends Ordered[Endpoint] {
   type Data
   protected def fetch(implicit ec: ExecutionContext): Future[Data]
+  val priority = 0
+
+  def compare(that: Endpoint) = if (this == that) {
+    // push the downloading endpoints forward
+    that.isFetched compareTo this.isFetched
+  } else if (this.priority != that.priority) {
+    // highest priority goes first
+    that.priority compareTo this.priority
+  } else {
+    // random stable order
+    // TODO: a better way?
+    that.toString compareTo this.toString
+  }
 
   final def isFetched = _fetched.synchronized(_fetched.isDefined)
   final private var _fetched: Option[Future[Data]] = None
@@ -16,13 +29,3 @@ trait Endpoint { self ⇒
     _fetched.get
   }
 }
-
-trait EndpointOps {
-  implicit class RichEndpoint(point: Endpoint) {
-    def orElse(other: Endpoint) = point :: other :: Nil
-  }
-  implicit class RichEndpointList(list: List[Endpoint]) {
-    def orElse(other: Endpoint) = list :+ other
-  }
-}
-object EndpointOps extends EndpointOps

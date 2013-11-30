@@ -2,13 +2,12 @@ package org.needs.json
 
 import play.api.libs.json._
 import org.needs.{Fulfillable, Endpoint}
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Future, ExecutionContext}
+import scala.collection.immutable.TreeSet
 
 trait JsonEndpoint extends Endpoint {
   type Data = JsValue
-  def as[A](implicit endpoints: List[Endpoint], ec: ExecutionContext, reads: Reads[Fulfillable[A]]) =
-    data.flatMap(v ⇒ v.as[Fulfillable[A]].fulfill)
 
-  def read[A](reads: Reads[Fulfillable[A]])(implicit endpoints: List[Endpoint], ec: ExecutionContext) =
-    data.flatMap(v ⇒ v.as[Fulfillable[A]](reads).fulfill)
+  def as[A](implicit reads: Reads[Fulfillable[A]]) =
+    Fulfillable.fromFuture(implicit ec ⇒ data.map(_.as[Fulfillable[A]]))
 }
