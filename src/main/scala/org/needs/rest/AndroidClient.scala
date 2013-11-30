@@ -14,7 +14,7 @@ case class JsonHandler(promise: Promise[JsValue]) extends AsyncHttpResponseHandl
   }
 }
 
-trait AndroidClient { self: RestEndpoint ⇒
+trait AndroidClient extends RestEndpoint {
   val asyncHttpClient: AsyncHttpClient
   def client(url: String)(implicit ec: ExecutionContext) = {
     val promise = Promise[JsValue]()

@@ -18,7 +18,7 @@ trait SingleResourceEndpoint extends RestEndpoint with HasId {
 }
 
 trait HasIds {
-  val ids: List[String]
+  val ids: Set[String]
 }
 
 trait MultipleResourceEndpoint extends RestEndpoint with HasIds {

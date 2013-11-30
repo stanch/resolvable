@@ -6,11 +6,13 @@ trait Endpoint { self ⇒
   type Data
   protected def fetch(implicit ec: ExecutionContext): Future[Data]
 
-  // if not for the ExecutionContext implicit,
-  // `data` would be a lazy val
+  final def isFetched = _fetched.synchronized(_fetched.isDefined)
   final private var _fetched: Option[Future[Data]] = None
   final def data(implicit ec: ExecutionContext) = _fetched.synchronized {
-    if (_fetched.isEmpty) _fetched = Some(fetch)
+    if (_fetched.isEmpty) {
+      println(s"downloading $this")
+      _fetched = Some(fetch)
+    }
     _fetched.get
   }
 }
