@@ -58,23 +58,23 @@ import org.needs._
 
 object Author {
   // `points` will be a current set of utilized endpoints
-  def reads(points: List[Endpoint])(implicit ec: ExecutionContext) = (
+  implicit val reads = (
     (__ \ 'id).read[String] and
     (__ \ 'name).read[String] and
     (__ \ 'avatar).read[String].map(NeedAvatar)
-  ).tupled.fulfillAll(points).mapM(Author.apply _ tupled)
+  ).tupled.liftAll[Fulfillable].fmap(Author.apply _ tupled)
   
   // the last line is a bit magical right now...
-  // basically `fulfillAll` converts Reads[(String, String, Need[File])] to Reads[Future[(String, String, File)]]
-  // and `mapM` converts Reads[Future[(String, String, File)]] to Reads[Future[Author]]
+  // `liftAll` converts Reads[(String, String, Fulfillable[File])] to Reads[Fulfillable[(String, String, File)]]
+  // `fmap` converts Reads[Fulfillable[(String, String, File)]] to Reads[Fulfillable[Author]]
 }
 
 object Book {
-  def reads(points: List[Endpoint])(implicit ec: ExecutionContext) = (
+  implicit val reads = (
     (__ \ 'id).read[String] and
     (__ \ 'title).read[String] and
     (__ \ 'authorId).read[String].map(NeedAuthor)
-  ).tupled.fulfillAll(points).mapM(Book.apply _ tupled)
+  ).tupled.liftAll[Fulfillable].fmap(Book.apply _ tupled)
 }
 
 /* Endpoints */
@@ -108,29 +108,29 @@ case class NeedBook(id: String) extends Need[Book] {
   val default = BookEndpoint(id)
   
   // try to load from a single endpoint
-  // `points` represent already utilized endpoints
-  def probe(points: List[Endpoint])(implicit ec: ExecutionContext): Future[Book] = {
-    case e @ BookEndpoint(i) if i == id ⇒ e.readAsync(Book.reads(points))
+  // `endpoints` represent already utilized endpoints
+  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
+    case e @ BookEndpoint(i) if i == id ⇒ e.as[Book]
     // put other endpoints here
   }
 }
 
 case class NeedAuthor(id: String) extends Need[Author] {
   val default = AuthorEndpoint(id)
-  def probe(points: List[Endpoint])(implicit ec: ExecutionContext) = {
-    case e @ AuthorEndpoint(i) if i == id ⇒ e.readAsync(Author.reads(points))
+  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
+    case e @ AuthorEndpoint(i) if i == id ⇒ e.as[Author]
   }
 }
 
 case class NeedAvatar(url: String) extends Need[File] {
   val default = CachedAvatar(url) orElse RemoteAvatar(url)
-  def probe(points: List[Endpoint])(implicit ec: ExecutionContext) = {
+  def probe(implicit endpoints: List[Endpoint], ec: ExecutionContext) = {
     case e: AvatarEndpoint if e.url == url ⇒ e.data
   }
 }
 
 import ExecutionContext.Implicits.global
-val book: Future[Book] = NeedBook("12").fulfill
+val book: Future[Book] = NeedBook("12").go
 ```
 
 This looks like a lot of code, but now if you want to add another endpoint, you just need a couple of lines.
