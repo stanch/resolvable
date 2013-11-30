@@ -34,7 +34,6 @@ object Fulfillable {
   // TODO: use CanBuildFrom to generalize to traversables?
   def sequence[A](in: List[Fulfillable[A]]) = new Fulfillable[List[A]] {
     def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = async {
-      // TODO: do a fold directly on futures
       val it = in.iterator
       var merged = endpoints
       while (it.hasNext) {
