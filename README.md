@@ -52,8 +52,9 @@ Why is this not a good idea? It mixes 3 things into one:
 
 ```scala
 import play.api.libs.json._
+import play.api.libs.functional.syntax._
+import play.api.libs.json.applicative._
 import org.needs._
-import org.needs.json._
 
 /* Deserialization (see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators) */
 
@@ -106,7 +107,9 @@ case class RemoteAvatar(url: String) extends AvatarEndpoint {
 
 case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   // list endpoints
-  use { BookEndpoint(id) }
+  use {
+    BookEndpoint(id)
+  }
   
   // describe how to load from them
   from {
@@ -114,8 +117,10 @@ case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   }
 }
 
-case class NeedAuthor(id: String) extends Need[Author] {
-  use { AuthorEndpoint(id) }
+case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
+  use {
+    AuthorEndpoint(id)
+  }
   from {
     singleResource[AuthorEndpoint]
   }
