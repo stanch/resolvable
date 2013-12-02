@@ -4,56 +4,44 @@ import scala.language.higherKinds
 import scala.concurrent.{Future, ExecutionContext}
 import play.api.libs.functional.{Functor, Applicative}
 import scala.async.Async._
-import scala.annotation.implicitNotFound
-import scala.collection.immutable.TreeSet
+import scala.util.{Failure, Success}
+import com.typesafe.scalalogging.slf4j.Logging
 
-trait Fulfillable[A] {
-  def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext): Future[TreeSet[Endpoint]]
-  def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext): Future[A]
-  def go(implicit ec: ExecutionContext) = sources(TreeSet.empty).flatMap(fulfill)
+trait Fulfillable[A] extends Logging {
+  val sources: EndpointPool
+  def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext): Future[A]
+  def go(implicit ec: ExecutionContext) = fulfill(sources)
 }
 
 object Fulfillable {
-  // TODO: this is not actually displayed
-  @implicitNotFound("No optimizer found in scope. You can import the basic one from Optimizers.Implicits.blank")
-  type Optimizer = TreeSet[Endpoint] ⇒ Future[TreeSet[Endpoint]]
-
   def fromFuture[A](in: ExecutionContext ⇒ Future[A]) = new Fulfillable[A] {
-    def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
-      Future.successful(endpoints)
-    def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = in(ec)
+    val sources = EndpointPool.empty
+    def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = in(ec)
   }
 
   def fromFutureFulfillable[A](in: ExecutionContext ⇒ Future[Fulfillable[A]]) = new Fulfillable[A] {
-    def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
-      Future.successful(endpoints)
-    def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
+    val sources = EndpointPool.empty
+    def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
       in(ec).flatMap(_.fulfill(endpoints))
   }
 
   // TODO: use CanBuildFrom to generalize to traversables?
-  def sequence[A](in: List[Fulfillable[A]]) = new Fulfillable[List[A]] {
-    def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = async {
-      val it = in.iterator
-      var merged = endpoints
-      while (it.hasNext) {
-        merged ++= await(it.next().sources(merged))
-      }
-      println(s"in sequence got $endpoints, returning $merged")
-      merged
-    }
-    def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = {
-      println(s"in sequence with $endpoints")
-      Future.sequence(in.map(_.fulfill(endpoints)))
+  def sequence[A](optimize: Option[EndpointPool ⇒ EndpointPool] = None)(in: List[Fulfillable[A]]) = new Fulfillable[List[A]] {
+    val sources = EndpointPool.merge(in.map(_.sources))
+    def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = {
+      val optimized = optimize.map { o ⇒
+        logger.debug("Optimizing endpoints...")
+        o(endpoints)
+      } getOrElse endpoints
+      Future.sequence(in.map(_.fulfill(optimized)))
     }
     override def toString = s"sequenced fulfillable from $in"
   }
 
   implicit object fulfillableFunctor extends Functor[Fulfillable] {
     def fmap[A, B](m: Fulfillable[A], f: A ⇒ B) = new Fulfillable[B] {
-      def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
-        m.sources(endpoints)
-      def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
+      val sources = m.sources
+      def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
         m.fulfill(endpoints).map(f)
       override def toString = s"$m mapped to $f"
     }
@@ -61,9 +49,8 @@ object Fulfillable {
 
   implicit object fulfillableApplicative extends Applicative[Fulfillable] {
     def pure[A](a: A) = new Fulfillable[A] {
-      def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
-        Future.successful(endpoints)
-      def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
+      val sources = EndpointPool.empty
+      def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
         Future.successful(a)
       override def toString = s"purified fulfillable from $a"
     }
@@ -71,26 +58,22 @@ object Fulfillable {
     def map[A, B](m: Fulfillable[A], f: A ⇒ B) = fulfillableFunctor.fmap(m, f)
 
     def apply[A, B](mf: Fulfillable[A ⇒ B], ma: Fulfillable[A]) = new Fulfillable[B] {
-      def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = async {
-        val merged = await(ma.sources(await(mf.sources(endpoints))))
-        println(s"in apply got $endpoints, returning $merged")
-        merged
-      }
+      val sources = mf.sources ++ ma.sources
 
-      def eitherFuture[X](f: Future[X])(implicit ec: ExecutionContext) =
-        f.map(Right[Throwable, X]).recover { case x ⇒ Left(x) }
+      def tryFuture[X](f: Future[X])(implicit ec: ExecutionContext) =
+        f.map(x ⇒ Success(x)).recover { case x ⇒ Failure(x) }
 
-      def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = async {
-        println(s"in apply with $endpoints")
-        val s = await(sources(endpoints))
-        val f = eitherFuture(mf.fulfill(s))
-        val a = eitherFuture(ma.fulfill(s))
+      def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
+        val s = endpoints ++ sources
+        //logger.debug(s"using $s")
+        val f = tryFuture(mf.fulfill(s))
+        val a = tryFuture(ma.fulfill(s))
         (await(f), await(a)) match {
-          case (Right(x), Right(y)) ⇒ x(y)
-          case (Left(Unfulfilled(x)), Left(Unfulfilled(y))) ⇒ throw Unfulfilled(x ::: y)
-          case (Left(Unfulfilled(_)), Left(t)) ⇒ throw t // don’t know how to merge Unfulfilled with other Throwables
-          case (Left(t), _) ⇒ throw t
-          case (_, Left(t)) ⇒ throw t
+          case (Success(x), Success(y)) ⇒ x(y)
+          case (Failure(Unfulfilled(x)), Failure(Unfulfilled(y))) ⇒ throw Unfulfilled(x ::: y)
+          case (Failure(Unfulfilled(_)), Failure(t)) ⇒ throw t // don’t know how to merge Unfulfilled with other Throwables
+          case (Failure(t), _) ⇒ throw t
+          case (_, Failure(t)) ⇒ throw t
         }
       }
 

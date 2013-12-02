@@ -8,7 +8,7 @@ case class Unfulfilled(needs: List[(Fulfillable[_], List[Endpoint])])
   extends Exception(needs map { case (need, tried) ⇒ s"Could not fulfill $need; tried ${tried.mkString(", ")}" } mkString ". ")
 
 trait Need[A] extends Fulfillable[A] {
-  var default: TreeSet[Endpoint] = TreeSet.empty
+  var default: EndpointPool = EndpointPool.empty
   var probes: PartialFunction[Endpoint, Fulfillable[A]] = PartialFunction.empty
 
   def use(endpoints: Endpoint*) {
@@ -19,11 +19,10 @@ trait Need[A] extends Fulfillable[A] {
     probes = probes orElse how
   }
 
-  override def sources(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) =
-    Future.successful(endpoints ++ default)
+  lazy val sources = default
 
   /** Fulfill the need using the specified endpoints */
-  def fulfill(endpoints: TreeSet[Endpoint])(implicit ec: ExecutionContext) = async {
+  def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
     val it = endpoints.iterator
     var found: Option[A] = None
     var tried: List[Endpoint] = Nil

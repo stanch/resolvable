@@ -4,38 +4,40 @@ import scala.language.postfixOps
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
+import play.api.libs.json.applicative._
 import org.scalatest.FlatSpec
-import org.needs.json._
-import scala.collection.immutable.TreeSet
+import org.needs.rest.JsonEndpoint
 
 /* Data model */
 
-//object Optimizer {
-//  implicit val o = { endpoints: TreeSet[Endpoint] ⇒
-//    val (add, p) = endpoints.foldLeft((List.empty[String], List.empty[Endpoint])) {
-//      case ((ids, pts), RemoteAuthor(id)) ⇒ (id :: ids, pts)
-//      case ((ids, pts), RemoteAuthors(i)) ⇒ (i.toList ::: ids, pts)
-//      case ((ids, pts), pt) ⇒ (ids, pts ::: pt :: Nil)
-//    }
-//    Future.successful(add match {
-//      case x :: Nil ⇒ RemoteAuthor(x) :: p
-//      case x :: _ ⇒ RemoteAuthors(add.toSet) :: p
-//      case _ ⇒ p
-//    })
-//  }
-//}
+object Optimizer {
+  def testMulti: Endpoint ⇒ Boolean = {
+    case RemoteAuthors(_) ⇒ true
+    case _ ⇒ false
+  }
+  val o = { endpoints: EndpointPool ⇒
+    val add = endpoints.endpoints.foldLeft(List.empty[String]) {
+      case (ids, RemoteAuthor(id)) ⇒ id :: ids
+      case (ids, RemoteAuthors(i)) ⇒ i.toList ::: ids
+      case (ids, _) ⇒ ids
+    }
+    val res = add match {
+      case x :: _ ⇒ endpoints + RemoteAuthors(add.toSet)
+      case _ ⇒ endpoints
+    }
+    res
+  }
+}
 
-import org.needs.Optimizers.Implicits.blank
-
-case class Author(id: String, name: String)
+case class Author(id: String, name: String) extends rest.HasId
 object Author {
   implicit val reads = (
     (__ \ '_id).read[String] and
     (__ \ 'name).read[String]
-  )(Author.apply _)
+  ).tupled.liftAll[Fulfillable].fmap(Author.apply _ tupled)
 }
 
-case class Story(id: String, name: String, author: Author)
+case class Story(id: String, name: String, author: Author) extends rest.HasId
 object Story {
   implicit val reads = (
     (__ \ '_id).read[String] and
@@ -57,7 +59,7 @@ case class Latest(totalRows: Int, stories: List[StoryPreview])
 object Latest {
   implicit val reads = (
     (__ \ 'total_rows).read[Int] and
-    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(Fulfillable.sequence)
+    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(Fulfillable.sequence(Some(Optimizer.o)))
   ).tupled.liftAll[Fulfillable].fmap(Latest.apply _ tupled)
 }
 
@@ -72,17 +74,19 @@ abstract class DispatchMultipleResource(val path: String)
   with rest.DispatchClient
 
 abstract class LocalSingleResource
-  extends json.JsonEndpoint
+  extends JsonEndpoint
   with rest.HasId {
 
   def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
 }
 
-trait Local { self: Endpoint ⇒ override val priority = 1 }
+trait Local { self: Endpoint ⇒ override val priority = Seq(1) }
 
 case class LocalAuthor(id: String) extends LocalSingleResource with Local
 case class RemoteAuthor(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/authors")
-case class RemoteAuthors(ids: Set[String]) extends DispatchMultipleResource("http://routestory.herokuapp.com/api/authors")
+case class RemoteAuthors(ids: Set[String]) extends DispatchMultipleResource("http://routestory.herokuapp.com/api/authors") {
+  override val priority = Seq(0, ids.size)
+}
 
 case class LocalStory(id: String) extends LocalSingleResource with Local
 case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories")
@@ -94,6 +98,9 @@ case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author
   use { RemoteAuthor(id) }
   from {
     singleResource[RemoteAuthor]
+  }
+  from {
+    multipleResources[RemoteAuthors]
   }
 }
 
