@@ -52,8 +52,9 @@ Why is this not a good idea? It mixes 3 things into one:
 
 ```scala
 import play.api.libs.json._
+import play.api.libs.functional.syntax._
+import play.api.libs.json.applicative._
 import org.needs._
-import org.needs.json._
 
 /* Deserialization (see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators) */
 
@@ -104,26 +105,32 @@ case class RemoteAvatar(url: String) extends AvatarEndpoint {
 
 /* Needs */
 
-case class NeedBook(id: String) extends Need[Book] {
+case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   // list endpoints
-  use { BookEndpoint(id) }
+  use {
+    BookEndpoint(id)
+  }
   
   // describe how to load from them
   from {
-    case e @ BookEndpoint(i) if i == id ⇒ e.asFulfillable[Book]
+    singleResource[BookEndpoint]
   }
 }
 
-case class NeedAuthor(id: String) extends Need[Author] {
-  use { AuthorEndpoint(id) }
+case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
+  use {
+    AuthorEndpoint(id)
+  }
   from {
-    case e @ AuthorEndpoint(i) if i == id ⇒ e.asFulfillable[Author]
+    singleResource[AuthorEndpoint]
   }
 }
 
 case class NeedAvatar(url: String) extends Need[File] {
   use(CachedAvatar(url), RemoteAvatar(url))
   from {
+    // here we don’t use the REST sugar as above
+    // but there will be some sweet File support in the future
     case e: AvatarEndpoint if e.url == url ⇒ e.asFulfillable
   }
 }
