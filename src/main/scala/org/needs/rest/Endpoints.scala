@@ -8,7 +8,7 @@ trait JsonEndpoint extends Endpoint {
   type Data = JsValue
 
   def asFulfillable[A](implicit reads: Reads[Fulfillable[A]]) =
-    Fulfillable.fromFutureFulfillable(implicit ec ⇒ data.map(_.as[Fulfillable[A]]))
+    Fulfillable.jumpOverFuture(implicit ec ⇒ data.map(_.as[Fulfillable[A]]))
 }
 
 trait RestEndpoint extends JsonEndpoint {

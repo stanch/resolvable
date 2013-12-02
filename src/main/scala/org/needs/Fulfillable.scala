@@ -5,67 +5,93 @@ import scala.concurrent.{Future, ExecutionContext}
 import play.api.libs.functional.{Functor, Applicative}
 import scala.async.Async._
 import scala.util.{Failure, Success}
-import com.typesafe.scalalogging.slf4j.Logging
 
-trait Fulfillable[A] extends Logging {
-  val sources: EndpointPool
+/** Fulfillable is something that can be fetched using a pool of Endpoints */
+trait Fulfillable[A] {
+  /** Default sources of fulfillment */
+  protected val sources: EndpointPool
+
+  /** Optimize fulfillment by adding aggregated endpoints */
+  protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext): Future[EndpointPool]
+
+  /** Fulfill using the specified endpoints */
   def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext): Future[A]
+
+  /** Fulfill using the default sources */
   def go(implicit ec: ExecutionContext) = fulfill(sources)
 }
 
 object Fulfillable {
+  /** Create a Fulfillable from existing ExecutionContext and Future */
   def fromFuture[A](in: ExecutionContext ⇒ Future[A]) = new Fulfillable[A] {
-    val sources = EndpointPool.empty
+    protected val sources = EndpointPool.empty
+    protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
+      Future.successful(endpoints)
     def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = in(ec)
   }
 
-  def fromFutureFulfillable[A](in: ExecutionContext ⇒ Future[Fulfillable[A]]) = new Fulfillable[A] {
-    val sources = EndpointPool.empty
+  /** Jump over the Future monad */
+  def jumpOverFuture[A](in: ExecutionContext ⇒ Future[Fulfillable[A]]) = new Fulfillable[A] {
+    protected val sources = EndpointPool.empty
+    protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
+      Future.successful(endpoints)
     def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
       in(ec).flatMap(_.fulfill(endpoints))
   }
 
   // TODO: use CanBuildFrom to generalize to traversables?
-  def sequence[A](optimize: Option[EndpointPool ⇒ EndpointPool] = None)(in: List[Fulfillable[A]]) = new Fulfillable[List[A]] {
-    val sources = EndpointPool.merge(in.map(_.sources))
-    def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = {
-      val optimized = optimize.map { o ⇒
-        logger.debug("Optimizing endpoints...")
-        o(endpoints)
-      } getOrElse endpoints
-      Future.sequence(in.map(_.fulfill(optimized)))
+  /** Jump over a List */
+  def jumpOverList[A](in: List[Fulfillable[A]]) = new Fulfillable[List[A]] {
+    protected val sources = EndpointPool.merge(in.map(_.sources))
+    protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
+      var optimized = endpoints
+      val it = in.iterator
+      while (it.hasNext) {
+        optimized = await(it.next().addOptimal(optimized))
+      }
+      optimized
     }
-    override def toString = s"sequenced fulfillable from $in"
+    def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
+      val optimized = await(addOptimal(endpoints))
+      await(Future.sequence(in.map(_.fulfill(optimized))))
+    }
   }
 
+  /** A Functor instance for Fulfillable */
   implicit object fulfillableFunctor extends Functor[Fulfillable] {
     def fmap[A, B](m: Fulfillable[A], f: A ⇒ B) = new Fulfillable[B] {
-      val sources = m.sources
+      protected val sources = m.sources
+      protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
+        m.addOptimal(endpoints)
       def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
         m.fulfill(endpoints).map(f)
-      override def toString = s"$m mapped to $f"
     }
   }
 
+  /** An Applicative instance for Fulfillable */
   implicit object fulfillableApplicative extends Applicative[Fulfillable] {
     def pure[A](a: A) = new Fulfillable[A] {
-      val sources = EndpointPool.empty
+      protected val sources = EndpointPool.empty
+      protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
+        Future.successful(endpoints)
       def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
         Future.successful(a)
-      override def toString = s"purified fulfillable from $a"
     }
 
     def map[A, B](m: Fulfillable[A], f: A ⇒ B) = fulfillableFunctor.fmap(m, f)
 
     def apply[A, B](mf: Fulfillable[A ⇒ B], ma: Fulfillable[A]) = new Fulfillable[B] {
-      val sources = mf.sources ++ ma.sources
+      protected val sources = mf.sources ++ ma.sources
+
+      protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
+        await(ma.addOptimal(await(mf.addOptimal(endpoints))))
+      }
 
       def tryFuture[X](f: Future[X])(implicit ec: ExecutionContext) =
         f.map(x ⇒ Success(x)).recover { case x ⇒ Failure(x) }
 
       def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
-        val s = endpoints ++ sources
-        //logger.debug(s"using $s")
+        val s = await(addOptimal(endpoints ++ sources))
         val f = tryFuture(mf.fulfill(s))
         val a = tryFuture(ma.fulfill(s))
         (await(f), await(a)) match {
@@ -76,8 +102,6 @@ object Fulfillable {
           case (_, Failure(t)) ⇒ throw t
         }
       }
-
-      override def toString = s"$ma applied to $mf"
     }
   }
 }

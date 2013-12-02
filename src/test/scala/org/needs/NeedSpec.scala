@@ -1,6 +1,7 @@
 package org.needs
 
 import scala.language.postfixOps
+import scala.language.implicitConversions
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
@@ -11,21 +12,13 @@ import org.needs.rest.JsonEndpoint
 /* Data model */
 
 object Optimizer {
-  def testMulti: Endpoint ⇒ Boolean = {
-    case RemoteAuthors(_) ⇒ true
-    case _ ⇒ false
-  }
   val o = { endpoints: EndpointPool ⇒
-    val add = endpoints.endpoints.foldLeft(List.empty[String]) {
-      case (ids, RemoteAuthor(id)) ⇒ id :: ids
-      case (ids, RemoteAuthors(i)) ⇒ i.toList ::: ids
+    val add = endpoints.fold(Set.empty[String]) {
+      case (ids, RemoteAuthor(id)) ⇒ ids + id
+      case (ids, RemoteAuthors(i)) ⇒ ids ++ i
       case (ids, _) ⇒ ids
     }
-    val res = add match {
-      case x :: _ ⇒ endpoints + RemoteAuthors(add.toSet)
-      case _ ⇒ endpoints
-    }
-    res
+    if (add.size > 1) endpoints + RemoteAuthors(add) else endpoints
   }
 }
 
@@ -59,7 +52,7 @@ case class Latest(totalRows: Int, stories: List[StoryPreview])
 object Latest {
   implicit val reads = (
     (__ \ 'total_rows).read[Int] and
-    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(Fulfillable.sequence(Some(Optimizer.o)))
+    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(Fulfillable.jumpOverList)
   ).tupled.liftAll[Fulfillable].fmap(Latest.apply _ tupled)
 }
 
@@ -96,11 +89,16 @@ case class RemoteStory(id: String) extends DispatchSingleResource("http://routes
 case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
   use { LocalAuthor(id) }
   use { RemoteAuthor(id) }
+
   from {
     singleResource[RemoteAuthor]
   }
   from {
     multipleResources[RemoteAuthors]
+  }
+
+  optimize {
+    Optimizer.o
   }
 }
 
@@ -125,7 +123,8 @@ case object NeedLatest extends Need[Latest] with rest.RestEndpoint with rest.Dis
 class NeedsSpec extends FlatSpec {
   it should "do smth" in {
     import scala.concurrent.ExecutionContext.Implicits.global
-    //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
+    NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
     NeedLatest.go onComplete println
+    (NeedAuthor("author-7sKtNqyebaTECWmr5LAJC") and NeedAuthor("author-QgMggevaDcYNRE8Aov3rY")).tupled.go onComplete println
   }
 }

@@ -2,33 +2,28 @@ package org.needs
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.typesafe.scalalogging.slf4j.Logging
-import scala.collection.immutable.TreeSet
 
-trait Endpoint extends Ordered[Endpoint] with Logging {
+/** An Endpoint represents something that can deliver data */
+trait Endpoint extends Logging {
+  /** Data type of the endpoint */
   type Data
+
+  /** The implementation of data fetching */
   protected def fetch(implicit ec: ExecutionContext): Future[Data]
+
+  /** Priorities dictate endpoint probing and fetching order */
   val priority = Seq(0, 0)
 
-  object SeqOrdering extends Ordering[Seq[Int]] {
-    def compare(x: Seq[Int], y: Seq[Int]) = (x zip y).find { case (p, q) ⇒ p != q } match {
-      case Some((p, q)) ⇒ p - q
-      case None ⇒ x.size - y.size
-    }
+  // this is important to avoid deleting already fetched endpoints from the pool
+  def canEqual(other: Any) = other match {
+    case point: Endpoint if point.isFetched == isFetched ⇒ true
+    case _ ⇒ false
   }
 
-  def compare(that: Endpoint) = if (this == that) {
-    // push the downloading endpoints forward
-    that.isFetched compareTo this.isFetched
-  } else if (this.priority != that.priority) {
-    // highest priority goes first
-    SeqOrdering.compare(that.priority, this.priority)
-  } else {
-    // random stable order
-    // TODO: a better way?
-    that.toString compareTo this.toString
-  }
-
+  /** Tells if the fetching process has started */
   final def isFetched = _fetched.synchronized(_fetched.isDefined)
+
+  // all this could be a lazy val, if not for the ExecutionContext
   final private var _fetched: Option[Future[Data]] = None
   final protected def data(implicit ec: ExecutionContext) = _fetched.synchronized {
     if (_fetched.isEmpty) {
@@ -38,14 +33,28 @@ trait Endpoint extends Ordered[Endpoint] with Logging {
     _fetched.get
   }
 
+  /** Returns a Fulfillable with the data */
   def asFulfillable = Fulfillable.fromFuture(implicit ec ⇒ data)
 }
 
-case class EndpointPool(endpoints: TreeSet[Endpoint]) {
-  def +(endpoint: Endpoint) = EndpointPool(this.endpoints + endpoint)
-  def ++(endpoints: Seq[Endpoint]) = EndpointPool(this.endpoints ++ endpoints)
-  def ++(pool: EndpointPool) = EndpointPool(this.endpoints ++ pool.endpoints)
-  def iterator = endpoints.iterator
+object Endpoint {
+  /** Orders endpoints by 1) having been fetched 2) priority */
+  def order(pt1: Endpoint, pt2: Endpoint) = if (pt1.isFetched != pt2.isFetched) {
+    pt1.isFetched > pt2.isFetched
+  } else (pt1.priority zip pt2.priority).find { case (p, q) ⇒ p != q } match {
+    case Some((p, q)) ⇒ p > q
+    case None ⇒ pt1.priority.size > pt2.priority.size
+  }
+}
+
+/** An EndpointPool is a collection of Endpoints */
+class EndpointPool(protected val endpoints: Set[Endpoint]) {
+  def +(endpoint: Endpoint) = new EndpointPool(this.endpoints + endpoint)
+  def ++(endpoints: Seq[Endpoint]) = new EndpointPool(this.endpoints ++ endpoints)
+  def ++(pool: EndpointPool) = new EndpointPool(this.endpoints ++ pool.endpoints)
+  def fold[A](z: A)(f: (A, Endpoint) ⇒ A) = endpoints.foldLeft[A](z)(f)
+  def iterator = endpoints.toList.sortWith(Endpoint.order).iterator
+
   override def toString = {
     val points = endpoints.toList map { e ⇒ (if (e.isFetched) "*" else "") + e.toString }
     s"Endpoints(${points.mkString(", ")})"
@@ -53,8 +62,6 @@ case class EndpointPool(endpoints: TreeSet[Endpoint]) {
 }
 
 object EndpointPool {
-  def empty = EndpointPool(TreeSet.empty)
-
-  def merge(pools: List[EndpointPool]) =
-    EndpointPool(TreeSet(pools.flatMap(_.endpoints): _*))
+  def empty = new EndpointPool(Set.empty)
+  def merge(pools: List[EndpointPool]) = pools.fold(EndpointPool.empty)(_ ++ _)
 }
