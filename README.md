@@ -34,6 +34,9 @@ Food for thought:
 * [json-api](http://jsonapi.org/) compound documents look nice!
 * **We want to optimize for all the above**. Still simple? [Skip the rest and show me the code!](#the-code)
 
+We will now split our problem into dealing with [endpoints](#endpoints), [dependencies](#needs)
+and [(JSON) deserialization](#deserialization).
+
 ### Endpoints
 
 Endpoints are probably the simplest part of the equation. Let’s start by baking in some common conventions:
@@ -111,7 +114,7 @@ case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
 
 ### Deserialization
 
-The only bit that is left is deserialization. Let’s use the awesome
+The only bit left is deserialization. Let’s use the awesome
 [play-json combinators](see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators)!
 Since `Fulfillable` is an applicative, we can turn `Reads[(String, String, Need[File])]` into `Reads[Fulfillable[Author]]`.
 
