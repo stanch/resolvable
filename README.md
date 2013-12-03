@@ -137,7 +137,7 @@ object Author {
 ```
 
 Once everything is set, we just need to call `NeedBook("123").go` to get a `Future[Book]`. Need several books?
-`Fulfillable.jumpList(List(NeedBook("123"), NeedBook("234"))).go`. You can use the play functional syntax as well:
+`Fulfillable.jumpOverList(List(NeedBook("123"), NeedBook("234"))).go`. You can use the play functional syntax as well:
 `(NeedBook("123") and NeedBook("234") and NeedAuthor("89")).tupled.go`.
 
 ### The code
