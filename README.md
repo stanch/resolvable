@@ -1,65 +1,127 @@
-### Motivating example
+### The RESTful hell
 
-Suppose we have this data model:
+So this happens. We have a book:
 
 ```scala
 case class Book(id: String, title: String, author: Author)
+```
+
+A book has an author:
+
+```scala
 case class Author(id: String, name: String, avatar: File)
 ```
 
-Now we want to fetch a book from a RESTful endpoint, but alas! the API does not quite match our model:
+An author has an avatar, which we want as a `File`.
 
-`/webservice/api/books/12`:
+We ask a webservice for a book with `id` `"123"`, and it gives us this:
+
 ```javascript
 {
-  "id": "12",
+  "id": "123",
   "title": "Hamlet",
-  "authorId": "34"
-}
-```
-`/webservice/api/authors/34`:
-```javascript
-{
-  "id": "34",
-  "name": "William Sheakspeare",
-  "avatar": "http://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Shakespeare.jpg/250px-Shakespeare.jpg"
+  "authorId": "345"
 }
 ```
 
-Here’s a “simple” way to do it:
+**So we fetch this JSON, extract the author `id`, fetch the author JSON from another endpoint, get the avatar `url`, fetch the avatar from yet another endoint...** Sounds simple, right?
+
+Food for thought:
+
+* We happen to have a small local database with some of the books aready fetched. There is also a local avatar cache.
+* If we fetch 10 books written by the same author, we expect the said author to be fetched only once.
+* If we fetch 10 books written by different authors, we expect the authors to be fetched with an aggregated request.
+* [json-api](http://jsonapi.org/) compound documents look nice!
+* **We want to optimize for all the above**. Still simple? [Skip the rest and show me the code!](#the-code)
+
+### Endpoints
+
+Endpoints are probably the simplest part of the equation. Let’s start by baking in some common conventions:
 
 ```scala
-import play.api.libs.json._
-import scala.async.Async._
-def getBook(id: String): Future[Book] = async {
-  val book = await(httpClient.get(s"/webservice/api/books/$id"))
-  val author = await(getAuthor((book \ "authorId").as[String]))
-  Book((book \ "id").as[String], (book \ "title").as[String], author)
+abstract class SingleResource(val path: String)
+  extends rest.SingleResourceEndpoint
+  with rest.DispatchClient
+  
+abstract class MultipleResources(val path: String)
+  extends rest.MultipleResourceEndpoint
+  with rest.DispatchClient
+
+case class RemoteBook(id: String)
+  extends SingleResource("/webservice/api/books")
+
+case class RemoteAuthor(id: String)
+  extends SingleResource("/webservice/api/authors")
+  
+case class RemoteAuthors(ids: Set[String])
+  extends MultipleResources("/webservice/api/authors")
+```
+
+The local endpoints currently require some boilerplate. Here’s an example:
+
+```scala
+trait AvatarEndpoint extends Endpoint {
+  type Data = File
+  val url: String
 }
-def getAuthor(id: String): Future[Author] = async {
-  ...
+
+case class CachedAvatar(url: String) extends AvatarEndpoint {
+  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // read file from disk
+  override val priority = Seq(1) // try before RemoteAvatar
+}
+
+case class RemoteAvatar(url: String) extends AvatarEndpoint {
+  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // download file from the net and cache it
 }
 ```
 
-Why is this not a good idea? It mixes 3 things into one:
-* *Where to get stuff*. In a real app, each object may be stored in several places, e.g. local file cache, local partial database replica, remote RESTful API, remote RDF API. If the `/webservice/api/books/:id` API may or may not already include the author (see “Compound documents” section at http://jsonapi.org/format/), we have to jump through the hoops to optimize for that.
-* *How to get stuff from an endpoint*. Different endpoints clearly require different handling: one might return a `File`, another one — a `JsValue`. There are even some that return `xml.Node`, duh.
-* *How to read stuff from JSON, XML, ...*. The fact that a book needs an author forces us to insert fetching code directly inside JSON deserialization, which is by no means flexible.
+### A small detour: Fulfillable
+
+Let’s call `Fulfillable[A]` **something, that knows how and where to get an `A` (asynchronously)**.
+This implies that in our example `Fulfillable[Book]` will need a little help from some `Fulfillable[Author]`
+(which in its turn needs a `Fulfillable[File]`): you can’t get a `Book` without an `Author`!
+
+Luckily for us, `Fulfillable` is an [applicative functor](http://adit.io/posts/2013-04-17-functors,_applicatives,_and_monads_in_pictures.html#applicatives).
+What this means is that if we have, say, a tuple `(String, String, Fulfillable[Author])`, we can make a
+`Fulfillable[(String, String, Author)]` out of that. Wait... so getting from `Fulfillable[Author]` to
+a `Fulfillable[Book]` should be a piece of cake!
 
 ### Needs
 
-*Needs* separates the concepts of `Endpoints`, dependencies (“`Need`s”) and serialization. Let’s have another take on our example:
+A concrete example of a `Fulfillable` is a `Need`. The `Need[A]` describes how to get an `A` by sequentially probing
+a number of `Endpoint`s:
+
+```scala
+case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
+  // list endpoints
+  use(RemoteBook(id), LocalBook(id))
+  
+  // describe how to load from them
+  from {
+    // using REST sugar
+    singleResource[RemoteBook]
+  }
+  from {
+    // using pattern matching
+    // (we say that a book is downloadable from LocalBook with the same id)
+    case b @ LocalBook(i) if i == id ⇒ b.asFulfillable[Book]
+  }
+}
+```
+
+### Deserialization
+
+The only bit that is left is deserialization. Let’s use the awesome
+[play-json combinators](see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators)!
+Since `Fulfillable` is an applicative, we can turn `Reads[(String, String, Need[File])]` into `Reads[Fulfillable[Author]]`.
 
 ```scala
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import play.api.libs.json.applicative._
-import org.needs._
-
-/* Deserialization (see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators) */
 
 object Author {
-  implicit val reads = (
+  implicit val reads: Reads[Fulfillable[Author]] = (
     (__ \ 'id).read[String] and
     (__ \ 'name).read[String] and
     (__ \ 'avatar).read[String].map(NeedAvatar)
@@ -68,6 +130,33 @@ object Author {
   // the last line is a bit magical right now...
   // `liftAll` converts Reads[(String, String, Fulfillable[File])] to Reads[Fulfillable[(String, String, File)]]
   // `fmap` converts Reads[Fulfillable[(String, String, File)]] to Reads[Fulfillable[Author]]
+}
+```
+
+Once everything is set, we just need to call `NeedBook("123").go` to get a `Future[Book]`. Need several books?
+`Fulfillable.jumpList(List(NeedBook("123"), NeedBook("234"))).go`. You can use the play functional syntax as well:
+`(NeedBook("123") and NeedBook("234") and NeedAuthor("89")).tupled.go`.
+
+### The code
+
+This example is not complete w.r.t. all the optimizations claimed above. But come on, it even deals with
+a fictional web service. Let me know which one I should use (no API key is a must). Anywan, there is
+another *working* example [in the tests](https://github.com/stanch/needs/blob/master/src/test/scala/org/needs/NeedSpec.scala).
+
+```scala
+import play.api.libs.json._
+import play.api.libs.functional.syntax._
+import play.api.libs.json.applicative._
+import org.needs._
+
+/* Deserialization */
+
+object Author {
+  implicit val reads = (
+    (__ \ 'id).read[String] and
+    (__ \ 'name).read[String] and
+    (__ \ 'avatar).read[String].map(NeedAvatar)
+  ).tupled.liftAll[Fulfillable].fmap(Author.apply _ tupled)
 }
 
 object Book {
@@ -85,11 +174,11 @@ abstract class SingleResource(val path: String)
   extends rest.SingleResourceEndpoint
   with rest.DispatchClient
 
-case class BookEndpoint(id: String) extends SingleResource("/webservice/api/books")
+case class RemoteBook(id: String) extends SingleResource("/webservice/api/books")
 
-case class AuthorEndpoint(id: String) extends SingleResource("/webservice/api/authors")
+case class RemoteAuthor(id: String) extends SingleResource("/webservice/api/authors")
 
-trait AvatarEndpoint {
+trait AvatarEndpoint extends Endpoint {
   type Data = File
   val url: String
 }
@@ -108,21 +197,21 @@ case class RemoteAvatar(url: String) extends AvatarEndpoint {
 case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   // list endpoints
   use {
-    BookEndpoint(id)
+    RemoteBook(id)
   }
   
   // describe how to load from them
   from {
-    singleResource[BookEndpoint]
+    singleResource[RemoteBook]
   }
 }
 
 case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
   use {
-    AuthorEndpoint(id)
+    RemoteAuthor(id)
   }
   from {
-    singleResource[AuthorEndpoint]
+    singleResource[RemoteAuthor]
   }
 }
 
@@ -143,4 +232,10 @@ This looks like a lot of code, but now if you want to add another endpoint, you 
 
 ### Status
 
-Experimental / not published. Things might change.
+Experimental. But already published...
+
+```scala
+resolvers += "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
+
+libraryDependencies += "org.needs" %% "needs" % "1.0.0-20131203"
+```
