@@ -96,7 +96,7 @@ trait AvatarEndpoint {
 
 case class CachedAvatar(url: String) extends AvatarEndpoint {
   def fetch(implicit ec: ExecutionContext): Future[File] = ??? // read file from disk
-  override val priority = 1 // try before RemoteAvatar
+  override val priority = Seq(1) // try before RemoteAvatar
 }
 
 case class RemoteAvatar(url: String) extends AvatarEndpoint {
