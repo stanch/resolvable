@@ -2,7 +2,9 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "0.1-SNAPSHOT"
+version := "1.0.0-20131203"
+
+licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
 scalaVersion := "2.10.3"
 
