@@ -230,5 +230,5 @@ Experimental. But already published...
 ```scala
 resolvers += "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
 
-libraryDependencies += "org.needs" %% "needs" % "1.0.0-20131203"
+libraryDependencies += "org.needs" %% "needs" % "1.0.0-20131204"
 ```
