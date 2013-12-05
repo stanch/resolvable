@@ -84,11 +84,6 @@ Let’s call `Fulfillable[A]` **something, that knows how and where to get an `A
 This implies that in our example `Fulfillable[Book]` will need a little help from some `Fulfillable[Author]`
 (which in its turn needs a `Fulfillable[File]`): you can’t get a `Book` without an `Author`!
 
-Luckily for us, `Fulfillable` is an [applicative functor](http://adit.io/posts/2013-04-17-functors,_applicatives,_and_monads_in_pictures.html#applicatives).
-What this means is that if we have, say, a tuple `(String, String, Fulfillable[Author])`, we can make a
-`Fulfillable[(String, String, Author)]` out of that. Wait... so getting from `Fulfillable[Author]` to
-a `Fulfillable[Book]` should be a piece of cake!
-
 ### Needs
 
 A concrete example of a `Fulfillable` is a `Need`. The `Need[A]` describes how to get an `A` by sequentially probing
@@ -115,29 +110,25 @@ case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
 ### Deserialization
 
 The only bit left is deserialization. Let’s use the awesome
-[play-json combinators](see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators)!
-Since `Fulfillable` is an applicative, we can turn `Reads[(String, String, Need[File])]` into `Reads[Fulfillable[Author]]`.
+[play-json combinators](see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators)
+and some help from `Fulfillable`.
 
 ```scala
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import play.api.libs.json.applicative._
 
 object Author {
-  implicit val reads: Reads[Fulfillable[Author]] = (
+  // this will have type Reads[Fulfillable[Author]]
+  implicit val reads = Fulfillable.reads[Author] {
     (__ \ 'id).read[String] and
     (__ \ 'name).read[String] and
     (__ \ 'avatar).read[String].map(NeedAvatar)
-  ).tupled.liftAll[Fulfillable].fmap(Author.apply _ tupled)
-  
-  // the last line is a bit magical right now...
-  // `liftAll` converts Reads[(String, String, Fulfillable[File])] to Reads[Fulfillable[(String, String, File)]]
-  // `fmap` converts Reads[Fulfillable[(String, String, File)]] to Reads[Fulfillable[Author]]
+  }
 }
 ```
 
 Once everything is set, we just need to call `NeedBook("123").go` to get a `Future[Book]`. Need several books?
-`Fulfillable.jumpOverList(List(NeedBook("123"), NeedBook("234"))).go`. You can use the play functional syntax as well:
+`Fulfillable.jumpList(List(NeedBook("123"), NeedBook("234"))).go`. You can use the play functional syntax as well:
 `(NeedBook("123") and NeedBook("234") and NeedAuthor("89")).tupled.go`.
 
 ### The code
@@ -149,25 +140,24 @@ another *working* example [in the tests](https://github.com/stanch/needs/blob/ma
 ```scala
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import play.api.libs.json.applicative._
 import org.needs._
 
 /* Deserialization */
 
 object Author {
-  implicit val reads = (
+  implicit val reads = Fulfillable.reads[Author] {
     (__ \ 'id).read[String] and
     (__ \ 'name).read[String] and
     (__ \ 'avatar).read[String].map(NeedAvatar)
-  ).tupled.liftAll[Fulfillable].fmap(Author.apply _ tupled)
+  }
 }
 
 object Book {
-  implicit val reads = (
+  implicit val reads = Fulfillable.reads[Book] {
     (__ \ 'id).read[String] and
     (__ \ 'title).read[String] and
     (__ \ 'authorId).read[String].map(NeedAuthor)
-  ).tupled.liftAll[Fulfillable].fmap(Book.apply _ tupled)
+  }
 }
 
 /* Endpoints */
