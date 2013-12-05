@@ -2,7 +2,7 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "1.0.0-20131203"
+version := "1.0.0-20131205"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
@@ -10,10 +10,7 @@ scalaVersion := "2.10.3"
 
 autoCompilerPlugins := true
 
-scalacOptions ++= Seq(
-  "-feature"//,
-  //"-Ydebug"
-)
+scalacOptions += "-feature"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),
@@ -27,12 +24,16 @@ libraryDependencies ++= Seq(
 
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-json" % "2.2.0",
-  "org.needs" %% "play-json-applicative" % "1.0.0",
-  "net.databinder.dispatch" %% "dispatch-core" % "0.11.0" % "compile",
-  "com.google.android" % "android" % "4.1.1.4" % "compile",
-  "com.loopj.android" % "android-async-http" % "1.4.4" % "compile",
+  "org.needs" %% "play-functional-extras" % "1.0.0",
   "org.scala-lang.modules" %% "scala-async" % "0.9.0-M4",
   "com.typesafe" %% "scalalogging-slf4j" % "1.0.1",
   "org.scalatest" %% "scalatest" % "2.0" % "test",
   "ch.qos.logback" % "logback-classic" % "1.0.13" % "test"
+)
+
+// http clients
+libraryDependencies ++= Seq(
+  "net.databinder.dispatch" %% "dispatch-core" % "0.11.0" % "compile",
+  "com.google.android" % "android" % "4.1.1.4" % "compile",
+  "com.loopj.android" % "android-async-http" % "1.4.4" % "compile"
 )

@@ -5,7 +5,6 @@ import scala.language.implicitConversions
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import play.api.libs.json.applicative._
 import org.scalatest.FlatSpec
 import org.needs.rest.JsonEndpoint
 
@@ -24,36 +23,33 @@ object Optimizer {
 
 case class Author(id: String, name: String) extends rest.HasId
 object Author {
-  implicit val reads = (
-    (__ \ '_id).read[String] and
-    (__ \ 'name).read[String]
-  ).tupled.liftAll[Fulfillable].fmap(Author.apply _ tupled)
+  implicit val reads = Json.reads[Author]
 }
 
 case class Story(id: String, name: String, author: Author) extends rest.HasId
 object Story {
-  implicit val reads = (
+  implicit val reads = Fulfillable.reads[Story] {
     (__ \ '_id).read[String] and
     (__ \ 'meta \ 'title).read[String] and
     (__ \ 'authorId).read[String].map(NeedAuthor)
-  ).tupled.liftAll[Fulfillable].fmap(Story.apply _ tupled)
+  }
 }
 
 case class StoryPreview(id: String, name: String, author: Author)
 object StoryPreview {
-  implicit val reads = (
+  implicit val reads = Fulfillable.reads[StoryPreview] {
     (__ \ 'id).read[String] and
     (__ \ 'value \ 'title).read[String] and
     (__ \ 'value \ 'authorId).read[String].map(NeedAuthor)
-  ).tupled.liftAll[Fulfillable].fmap(StoryPreview.apply _ tupled)
+  }
 }
 
 case class Latest(totalRows: Int, stories: List[StoryPreview])
 object Latest {
-  implicit val reads = (
+  implicit val reads = Fulfillable.reads[Latest] {
     (__ \ 'total_rows).read[Int] and
-    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(Fulfillable.jumpOverList)
-  ).tupled.liftAll[Fulfillable].fmap(Latest.apply _ tupled)
+    (__ \ 'rows).read[List[Fulfillable[StoryPreview]]].map(Fulfillable.jumpList)
+  }
 }
 
 /* Endpoints */

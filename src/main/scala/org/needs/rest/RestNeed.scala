@@ -27,7 +27,7 @@ object RestNeedMacros {
     import c.universe._
     c.Expr[PartialFunction[Endpoint, Fulfillable[A]]](q"""{
       case x: ${weakTypeOf[X]} if x.ids.contains(this.id) ⇒
-        val list = x.asFulfillable[${weakTypeOf[List[A]]}]($reads.map(org.needs.Fulfillable.sequence))
+        val list = x.asFulfillable[${weakTypeOf[List[A]]}]($reads.map(org.needs.Fulfillable.jumpList))
         org.needs.Fulfillable.fulfillableFunctor.fmap(list, { l: ${weakTypeOf[List[A]]} ⇒ l.find(_.id == this.id).get })
       }"""
     )
