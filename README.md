@@ -110,7 +110,7 @@ case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
 ### Deserialization
 
 The only bit left is deserialization. Let’s use the awesome
-[play-json combinators](see http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators)
+[play-json combinators](http://www.playframework.com/documentation/2.2.1/ScalaJsonCombinators)
 and some help from `Fulfillable`.
 
 ```scala
