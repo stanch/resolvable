@@ -134,7 +134,7 @@ Once everything is set, we just need to call `NeedBook("123").go` to get a `Futu
 ### The code
 
 This example is not complete w.r.t. all the optimizations claimed above. But come on, it even deals with
-a fictional web service. Let me know which one I should use (no API key is a must). Anywan, there is
+a fictional web service. Let me know which one I should use (no API key is a must). Anyway, there is
 another *working* example [in the tests](https://github.com/stanch/needs/blob/master/src/test/scala/org/needs/NeedSpec.scala).
 
 ```scala
