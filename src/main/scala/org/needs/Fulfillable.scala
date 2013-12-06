@@ -32,7 +32,7 @@ object Fulfillable {
 
   /** Create a Reads[Fulfillable[A]] from Reads[A] */
   implicit def reads[A](implicit reads: Reads[A]): Reads[Fulfillable[A]] =
-    reads.map(fulfillableApplicative.pure)
+    reads.map(applicative.pure)
 
   /** Shorthand map function */
   def map[A, B](m: Fulfillable[A], f: A ⇒ B) = new Fulfillable[B] {
@@ -88,12 +88,12 @@ object Fulfillable {
   }
 
   /** A Functor instance for Fulfillable */
-  implicit object fulfillableFunctor extends Functor[Fulfillable] {
+  implicit object functor extends Functor[Fulfillable] {
     def fmap[A, B](m: Fulfillable[A], f: A ⇒ B) = Fulfillable.map(m, f)
   }
 
   /** An Applicative instance for Fulfillable */
-  implicit object fulfillableApplicative extends Applicative[Fulfillable] {
+  implicit object applicative extends Applicative[Fulfillable] {
     def pure[A](a: A) = new Fulfillable[A] {
       protected val sources = EndpointPool.empty
       protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =

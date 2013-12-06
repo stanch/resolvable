@@ -19,7 +19,7 @@ object ProbingMacros {
   def singleResourceImpl[A, X <: SingleResourceEndpoint](c: Context)(reads: c.Expr[Reads[Fulfillable[A]]])(implicit aType: c.WeakTypeTag[A], xType: c.WeakTypeTag[X]) = {
     import c.universe._
     c.Expr[PartialFunction[Endpoint, Fulfillable[A]]](
-      q"{ case x: ${weakTypeOf[X]} if x.id == this.id ⇒ x.asFulfillable[${weakTypeOf[A]}] }"
+      q"{ case x: ${weakTypeOf[X]} if x.id == this.id ⇒ x.probeAs[${weakTypeOf[A]}] }"
     )
   }
 
@@ -27,7 +27,7 @@ object ProbingMacros {
     import c.universe._
     c.Expr[PartialFunction[Endpoint, Fulfillable[A]]](q"""{
       case x: ${weakTypeOf[X]} if x.ids.contains(this.id) ⇒
-        val list = x.asFulfillable[${weakTypeOf[List[A]]}]($reads.map(org.needs.Fulfillable.jumpList))
+        val list = x.probeAs[${weakTypeOf[List[A]]}]($reads.map(org.needs.Fulfillable.jumpList))
         org.needs.Fulfillable.map(list, { l: ${weakTypeOf[List[A]]} ⇒ l.find(_.id == this.id).get })
       }"""
     )

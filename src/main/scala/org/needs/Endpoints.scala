@@ -36,7 +36,7 @@ trait Endpoint {
   }
 
   /** Returns a Fulfillable with the data */
-  def asFulfillable = Fulfillable.fromFuture(implicit ec ⇒ data)
+  def probe = Fulfillable.fromFuture(implicit ec ⇒ data)
 }
 
 object Endpoint {

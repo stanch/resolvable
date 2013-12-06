@@ -20,6 +20,7 @@ case class Unfulfilled(need: Need[_], probed: List[Probed]) {
 case class Chagrin(needs: List[Unfulfilled])
   extends Exception(needs.mkString("\nCould not fulfill:\n - ", ";\n - ", "\n"))
 
+/** A Need is a concrete implementation of Fulfillable, that is fulfilled by probing a set of Endpoints */
 trait Need[A] extends Fulfillable[A] {
   private var default: EndpointPool = EndpointPool.empty
   private var probes: PartialFunction[Endpoint, Fulfillable[A]] = PartialFunction.empty
@@ -30,7 +31,7 @@ trait Need[A] extends Fulfillable[A] {
     default ++= endpoints
   }
 
-  /** Define how to fulfill the need from a particular endpoint */
+  /** Define how to fulfill the need by probing a particular endpoint */
   def from(how: PartialFunction[Endpoint, Fulfillable[A]]) {
     probes = probes orElse how
   }
@@ -92,6 +93,6 @@ abstract class SelfFulfillingNeed[A] extends Need[A] with Endpoint {
   type Data = A
   use { this }
   from {
-    case e if e == this ⇒ asFulfillable
+    case e if e == this ⇒ probe
   }
 }
