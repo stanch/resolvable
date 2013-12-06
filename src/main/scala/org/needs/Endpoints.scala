@@ -11,7 +11,7 @@ trait Endpoint {
   protected def fetch(implicit ec: ExecutionContext): Future[Data]
 
   /** Override to log when downloading starts */
-  protected def logDownloading() {}
+  protected def logFetching() {}
 
   /** Priorities dictate endpoint probing and fetching order */
   val priority = Seq(0, 0)
@@ -29,7 +29,7 @@ trait Endpoint {
   final private var _fetched: Option[Future[Data]] = None
   final protected def data(implicit ec: ExecutionContext) = _fetched.synchronized {
     if (_fetched.isEmpty) {
-      logDownloading()
+      logFetching()
       //logDownloading()
       _fetched = Some(fetch)
     }

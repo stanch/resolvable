@@ -1,7 +1,5 @@
 package org.needs
 
-import scala.language.postfixOps
-import scala.language.implicitConversions
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
