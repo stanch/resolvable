@@ -23,7 +23,10 @@ object Optimizer {
 
 case class Author(id: String, name: String) extends rest.HasId
 object Author {
-  implicit val reads = Json.reads[Author]
+  implicit val reads = Fulfillable.reads[Author] {
+    (__ \ '_id).read[String] and
+    (__ \ 'name).read[String]
+  }
 }
 
 case class Story(id: String, name: String, author: Author) extends rest.HasId
@@ -54,13 +57,21 @@ object Latest {
 
 /* Endpoints */
 
+trait Logging { self: Endpoint ⇒
+  override protected def logDownloading() {
+    println(s"--> Downloading $this")
+  }
+}
+
 abstract class DispatchSingleResource(val path: String)
   extends rest.SingleResourceEndpoint
   with rest.DispatchClient
+  with Logging
 
 abstract class DispatchMultipleResource(val path: String)
   extends rest.MultipleResourceEndpoint
   with rest.DispatchClient
+  with Logging
 
 abstract class LocalSingleResource
   extends JsonEndpoint

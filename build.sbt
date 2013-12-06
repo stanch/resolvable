@@ -2,7 +2,7 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "1.0.0-20131206-1"
+version := "1.0.0-20131206-2"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
@@ -26,9 +26,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-json" % "2.2.0",
   "org.needs" %% "play-functional-extras" % "1.0.0",
   "org.scala-lang.modules" %% "scala-async" % "0.9.0-M4",
-  "com.typesafe" %% "scalalogging-slf4j" % "1.0.1",
-  "org.scalatest" %% "scalatest" % "2.0" % "test",
-  "ch.qos.logback" % "logback-classic" % "1.0.13" % "test"
+  "org.scalatest" %% "scalatest" % "2.0" % "test"
 )
 
 // http clients

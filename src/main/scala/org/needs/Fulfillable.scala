@@ -120,8 +120,8 @@ object Fulfillable {
         val a = tryFuture(ma.fulfill(s))
         (await(f), await(a)) match {
           case (Success(x), Success(y)) ⇒ x(y)
-          case (Failure(Unfulfilled(x)), Failure(Unfulfilled(y))) ⇒ throw Unfulfilled(x ::: y)
-          case (Failure(Unfulfilled(_)), Failure(t)) ⇒ throw t // don’t know how to merge Unfulfilled with other Throwables
+          case (Failure(Chagrin(x)), Failure(Chagrin(y))) ⇒ throw Chagrin(x ::: y)
+          case (Failure(Chagrin(_)), Failure(t)) ⇒ throw t // don’t know how to merge Unfulfilled with other Throwables
           case (Failure(t), _) ⇒ throw t
           case (_, Failure(t)) ⇒ throw t
         }

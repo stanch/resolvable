@@ -1,15 +1,17 @@
 package org.needs
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.typesafe.scalalogging.slf4j.Logging
 
 /** An Endpoint represents something that can deliver data */
-trait Endpoint extends Logging {
+trait Endpoint {
   /** Data type of the endpoint */
   type Data
 
   /** The implementation of data fetching */
   protected def fetch(implicit ec: ExecutionContext): Future[Data]
+
+  /** Override to log when downloading starts */
+  protected def logDownloading() {}
 
   /** Priorities dictate endpoint probing and fetching order */
   val priority = Seq(0, 0)
@@ -27,7 +29,8 @@ trait Endpoint extends Logging {
   final private var _fetched: Option[Future[Data]] = None
   final protected def data(implicit ec: ExecutionContext) = _fetched.synchronized {
     if (_fetched.isEmpty) {
-      logger.debug(s"--> Downloading $this")
+      logDownloading()
+      //logDownloading()
       _fetched = Some(fetch)
     }
     _fetched.get

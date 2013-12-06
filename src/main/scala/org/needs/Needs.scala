@@ -1,13 +1,24 @@
 package org.needs
 
 import scala.language.implicitConversions
+import scala.language.existentials
 import scala.concurrent.{Future, ExecutionContext}
 import scala.async.Async._
 import play.api.libs.functional.syntax._
 
+/** Holds an exception encountered during probing an endpoint */
+case class Probed(endpoint: Endpoint, got: Throwable) {
+  override def toString = s"$endpoint, got $got"
+}
+
+/** Holds an unfulfilled Need */
+case class Unfulfilled(need: Need[_], probed: List[Probed]) {
+  override def toString = s"$need, ${probed.mkString("probed:\n   - ", ";\n   - ", "")}"
+}
+
 /** An exception class to report unfulfilled needs */
-case class Unfulfilled(needs: List[(Fulfillable[_], List[Endpoint])])
-  extends Exception(needs map { case (need, tried) ⇒ s" - $need; tried ${tried.mkString(", ")}" } mkString("\nCould not fulfill\n", ".\n", "."))
+case class Chagrin(needs: List[Unfulfilled])
+  extends Exception(needs.mkString("\nCould not fulfill:\n - ", ";\n - ", "\n"))
 
 trait Need[A] extends Fulfillable[A] {
   private var default: EndpointPool = EndpointPool.empty
@@ -54,19 +65,20 @@ trait Need[A] extends Fulfillable[A] {
   def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
     val it = endpoints.iterator
     var found: Option[A] = None
-    var tried: List[Endpoint] = Nil
+    var probed: List[Probed] = Nil
     while (it.hasNext && found.isEmpty) {
       val pt = it.next()
       if (probes.isDefinedAt(pt)) {
         found = await(probes(pt).fulfill(endpoints).map(x ⇒ Some(x)).recover {
-          case u @ Unfulfilled(needs) if !needs.contains(this) ⇒ throw u
-          case _ ⇒ tried ::= pt; None
+          // if something else was not found, stop trying
+          case u @ Chagrin(needs) if !needs.map(_.need).contains(this) ⇒ throw u
+          case t ⇒ probed ::= Probed(pt, t); None
         })
       }
     }
     found match {
       case Some(a) ⇒ a
-      case None ⇒ throw Unfulfilled((this, tried) :: Nil)
+      case None ⇒ throw Chagrin(Unfulfilled(this, probed) :: Nil)
     }
   }
 }
