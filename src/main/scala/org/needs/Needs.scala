@@ -86,3 +86,12 @@ trait Need[A] extends Fulfillable[A] {
 object Need {
   implicit def toFBO[A](x: Need[A]) = toFunctionalBuilderOps[Fulfillable, A](x)
 }
+
+/** A Need that uses itself as an Endpoint */
+abstract class SelfFulfillingNeed[A] extends Need[A] with Endpoint {
+  type Data = A
+  use { this }
+  from {
+    case e if e == this ⇒ asFulfillable
+  }
+}

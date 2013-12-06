@@ -30,7 +30,6 @@ trait Endpoint {
   final protected def data(implicit ec: ExecutionContext) = _fetched.synchronized {
     if (_fetched.isEmpty) {
       logFetching()
-      //logDownloading()
       _fetched = Some(fetch)
     }
     _fetched.get

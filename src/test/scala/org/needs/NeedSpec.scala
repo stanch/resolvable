@@ -4,7 +4,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.scalatest.FlatSpec
-import org.needs.rest.JsonEndpoint
+import org.needs.json.JsonEndpoint
+import org.needs.http.{DispatchJsonClient, HttpEndpoint, DispatchClient}
 
 /* Data model */
 
@@ -56,20 +57,18 @@ object Latest {
 /* Endpoints */
 
 trait Logging { self: Endpoint ⇒
-  override protected def logDownloading() {
+  override protected def logFetching() {
     println(s"--> Downloading $this")
   }
 }
 
+trait RestBase extends DispatchJsonClient with Logging { self: HttpEndpoint with JsonEndpoint ⇒ }
+
 abstract class DispatchSingleResource(val path: String)
-  extends rest.SingleResourceEndpoint
-  with rest.DispatchClient
-  with Logging
+  extends rest.SingleResourceEndpoint with RestBase
 
 abstract class DispatchMultipleResource(val path: String)
-  extends rest.MultipleResourceEndpoint
-  with rest.DispatchClient
-  with Logging
+  extends rest.MultipleResourceEndpoint with RestBase
 
 abstract class LocalSingleResource
   extends JsonEndpoint
@@ -91,7 +90,7 @@ case class RemoteStory(id: String) extends DispatchSingleResource("http://routes
 
 /* Needs */
 
-case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
+case class NeedAuthor(id: String) extends Need[Author] with rest.Probing[Author] {
   use { LocalAuthor(id) }
   use { RemoteAuthor(id) }
 
@@ -107,7 +106,7 @@ case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author
   }
 }
 
-case class NeedStory(id: String) extends Need[Story] with rest.RestNeed[Story] {
+case class NeedStory(id: String) extends Need[Story] with rest.Probing[Story] {
   use { LocalStory(id) }
   use { RemoteStory(id) }
   from {
@@ -115,21 +114,16 @@ case class NeedStory(id: String) extends Need[Story] with rest.RestNeed[Story] {
   }
 }
 
-case object NeedLatest extends Need[Latest] with rest.RestEndpoint with rest.DispatchClient { Self ⇒
+case class NeedLatest() extends json.SelfFulfillingNeed[Latest] with HttpEndpoint with RestBase {
   def fetch(implicit ec: ExecutionContext) =
     client("http://routestory.herokuapp.com/api/stories/latest")
-
-  use { Self }
-  from {
-    case Self ⇒ asFulfillable[Latest]
-  }
 }
 
 class NeedsSpec extends FlatSpec {
   it should "do smth" in {
     import scala.concurrent.ExecutionContext.Implicits.global
     NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
-    NeedLatest.go onComplete println
+    NeedLatest().go onComplete println
     (NeedAuthor("author-7sKtNqyebaTECWmr5LAJC") and NeedAuthor("author-QgMggevaDcYNRE8Aov3rY")).tupled.go onComplete println
   }
 }

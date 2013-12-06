@@ -1,19 +1,10 @@
 package org.needs.rest
 
-import scala.concurrent.{ExecutionContext, Future}
-import play.api.libs.json._
-import org.needs.{Fulfillable, Endpoint}
+import scala.concurrent.ExecutionContext
+import org.needs.json.JsonEndpoint
+import org.needs.http.HttpEndpoint
 
-trait JsonEndpoint extends Endpoint {
-  type Data = JsValue
-
-  def asFulfillable[A](implicit reads: Reads[Fulfillable[A]]) =
-    Fulfillable.jumpFuture(implicit ec ⇒ data.map(_.as[Fulfillable[A]]))
-}
-
-trait RestEndpoint extends JsonEndpoint {
-  def client(url: String)(implicit ec: ExecutionContext): Future[JsValue]
-}
+sealed trait RestEndpoint extends HttpEndpoint with JsonEndpoint
 
 trait HasId {
   val id: String
