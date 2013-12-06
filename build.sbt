@@ -2,7 +2,7 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "1.0.0-20131206"
+version := "1.0.0-20131206-1"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
@@ -33,7 +33,7 @@ libraryDependencies ++= Seq(
 
 // http clients
 libraryDependencies ++= Seq(
-  "net.databinder.dispatch" %% "dispatch-core" % "0.11.0" % "compile",
-  "com.google.android" % "android" % "4.1.1.4" % "compile",
-  "com.loopj.android" % "android-async-http" % "1.4.4" % "compile"
+  "net.databinder.dispatch" %% "dispatch-core" % "0.11.0" % "provided",
+  "com.google.android" % "android" % "4.1.1.4" % "provided",
+  "com.loopj.android" % "android-async-http" % "1.4.4" % "provided"
 )
