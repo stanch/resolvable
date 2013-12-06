@@ -78,6 +78,15 @@ object Fulfillable {
     }
   }
 
+  /** Jump over an Option */
+  def jumpOption[A](in: Option[Fulfillable[A]]) = new Fulfillable[Option[A]] {
+    protected val sources = in.map(_.sources).getOrElse(EndpointPool.empty)
+    protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
+      in.map(_.addOptimal(endpoints)).getOrElse(Future.successful(endpoints))
+    def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
+      in.map(_.fulfill(endpoints).map(Some.apply)).getOrElse(Future.successful(None))
+  }
+
   /** A Functor instance for Fulfillable */
   implicit object fulfillableFunctor extends Functor[Fulfillable] {
     def fmap[A, B](m: Fulfillable[A], f: A ⇒ B) = Fulfillable.map(m, f)
