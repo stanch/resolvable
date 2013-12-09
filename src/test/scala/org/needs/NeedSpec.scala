@@ -20,16 +20,18 @@ object Optimizer {
   }
 }
 
-case class Author(id: String, name: String) extends rest.HasId
+case class Author(id: String, name: String)
 object Author {
+  implicit object hasId extends rest.HasId[Author] { def id(entity: Author) = entity.id }
   implicit val reads = Fulfillable.reads[Author] {
     (__ \ '_id).read[String] and
     (__ \ 'name).read[String]
   }
 }
 
-case class Story(id: String, name: String, author: Author) extends rest.HasId
+case class Story(id: String, name: String, author: Author)
 object Story {
+  implicit object hasId extends rest.HasId[Story] { def id(entity: Story) = entity.id }
   implicit val reads = Fulfillable.reads[Story] {
     (__ \ '_id).read[String] and
     (__ \ 'meta \ 'title).read[String] and
@@ -70,10 +72,7 @@ abstract class DispatchSingleResource(val path: String)
 abstract class DispatchMultipleResource(val path: String)
   extends rest.MultipleResourceEndpoint with RestBase
 
-abstract class LocalSingleResource
-  extends JsonEndpoint
-  with rest.HasId {
-
+abstract class LocalSingleResource extends JsonEndpoint {
   def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
 }
 
