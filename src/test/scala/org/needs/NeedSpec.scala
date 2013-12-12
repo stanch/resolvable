@@ -113,16 +113,16 @@ case class NeedStory(id: String) extends Need[Story] with rest.Probing[Story] {
   }
 }
 
-case class NeedLatest() extends json.SelfFulfillingNeed[Latest] with HttpEndpoint with RestBase {
+case class NeedLatest(count: Int) extends json.SelfFulfillingNeed[Latest] with HttpEndpoint with RestBase {
   def fetch(implicit ec: ExecutionContext) =
-    client("http://routestory.herokuapp.com/api/stories/latest")
+    client("http://routestory.herokuapp.com/api/stories/latest", Map("limit" → count.toString))
 }
 
 class NeedsSpec extends FlatSpec {
   it should "do smth" in {
     import scala.concurrent.ExecutionContext.Implicits.global
     NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
-    NeedLatest().go onComplete println
+    NeedLatest(5).go onComplete println
     (NeedAuthor("author-7sKtNqyebaTECWmr5LAJC") and NeedAuthor("author-QgMggevaDcYNRE8Aov3rY")).tupled.go onComplete println
   }
 }

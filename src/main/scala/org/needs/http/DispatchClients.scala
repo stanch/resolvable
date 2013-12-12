@@ -9,11 +9,11 @@ import org.needs.file.FileEndpoint
 sealed trait DispatchClient
 
 trait DispatchJsonClient extends DispatchClient { self: HttpEndpoint with JsonEndpoint ⇒
-  def client(url: String)(implicit ec: ExecutionContext) =
-    Http(dispatch.url(url) OK dispatch.as.String).map(Json.parse)
+  def client(url: String, query: Map[String, String] = Map.empty)(implicit ec: ExecutionContext) =
+    Http((dispatch.url(url) <<? query) OK dispatch.as.String).map(Json.parse)
 }
 
 trait DispatchFileClient extends DispatchClient { self: HttpEndpoint with FileEndpoint ⇒
-  def client(url: String)(implicit ec: ExecutionContext) =
-    Http(dispatch.url(url) > dispatch.as.File(create))
+  def client(url: String, query: Map[String, String] = Map.empty)(implicit ec: ExecutionContext) =
+    Http((dispatch.url(url) <<? query) > dispatch.as.File(create))
 }
