@@ -76,8 +76,12 @@ case class CachedAvatar(url: String) extends AvatarEndpoint {
     Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
 }
 
-case class RemoteAvatar(url: String) extends AvatarEndpoint {
-  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // download file from the net and save it
+case class RemoteAvatar(url: String)
+  extends AvatarEndpoint
+  with http.HttpEndpoint
+  with http.DispatchFileClient {
+  
+  def fetch(implicit ec: ExecutionContext): Future[File] = client(create)
 }
 ```
 
@@ -187,8 +191,12 @@ case class CachedAvatar(url: String) extends AvatarEndpoint {
     Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
 }
 
-case class RemoteAvatar(url: String) extends AvatarEndpoint {
-  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // download file from the net and save it
+case class RemoteAvatar(url: String)
+  extends AvatarEndpoint
+  with http.HttpEndpoint
+  with http.DispatchFileClient {
+  
+  def fetch(implicit ec: ExecutionContext): Future[File] = client(create)
 }
 
 /* Needs */
