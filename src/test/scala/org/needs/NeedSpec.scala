@@ -67,10 +67,10 @@ trait Logging { self: Endpoint ⇒
 
 trait RestBase extends DispatchJsonClient with Logging { self: HttpEndpoint with JsonEndpoint ⇒ }
 
-abstract class DispatchSingleResource(val path: String)
+abstract class DispatchSingleResource(val baseUrl: String)
   extends rest.SingleResourceEndpoint with RestBase
 
-abstract class DispatchMultipleResource(val path: String)
+abstract class DispatchMultipleResource(val baseUrl: String)
   extends rest.MultipleResourceEndpoint with RestBase
 
 abstract class LocalSingleResource extends JsonEndpoint {

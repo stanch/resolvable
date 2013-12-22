@@ -18,5 +18,6 @@ trait LocalFileEndpoint extends FileEndpoint {
 
 trait HttpFileEndpoint extends FileEndpoint with HttpEndpoint {
   val url: String
-  protected def fetch(implicit ec: ExecutionContext) = client(url)
+  val baseUrl: String
+  protected def fetch(implicit ec: ExecutionContext) = client(new File(baseUrl, url).getAbsolutePath)
 }

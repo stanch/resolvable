@@ -14,12 +14,12 @@ trait HasId[-A] {
 
 trait SingleResourceEndpoint extends RestEndpoint {
   val id: String
-  val path: String
-  def fetch(implicit ec: ExecutionContext) = client(s"$path/$id")
+  val baseUrl: String
+  def fetch(implicit ec: ExecutionContext) = client(s"$baseUrl/$id")
 }
 
 trait MultipleResourceEndpoint extends RestEndpoint {
   val ids: Set[String]
-  val path: String
-  def fetch(implicit ec: ExecutionContext) = client(s"$path/${ids.mkString(",")}")
+  val baseUrl: String
+  def fetch(implicit ec: ExecutionContext) = client(s"$baseUrl/${ids.mkString(",")}")
 }
