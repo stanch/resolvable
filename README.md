@@ -80,7 +80,7 @@ case class RemoteAvatar(url: String)
   with file.HttpFileEndpoint
   with http.DispatchFileClient {
   
-  val baseUrl = "/webservice/files" // file will be loaded from /sebservice/files/:url
+  val baseUrl = "/webservice/files" // file will be loaded from /webservice/files/:url
 }
 ```
 
