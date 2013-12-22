@@ -44,11 +44,11 @@ Endpoints are probably the simplest part of the equation. Let’s start by bakin
 ```scala
 abstract class SingleResource(val path: String)
   extends rest.SingleResourceEndpoint
-  with rest.DispatchClient
+  with http.DispatchJsonClient
   
 abstract class MultipleResources(val path: String)
   extends rest.MultipleResourceEndpoint
-  with rest.DispatchClient
+  with http.DispatchJsonClient
 
 case class RemoteBook(id: String)
   extends SingleResource("/webservice/api/books")
@@ -63,18 +63,25 @@ case class RemoteAuthors(ids: Set[String])
 The local endpoints currently require some boilerplate. Here’s an example:
 
 ```scala
-trait AvatarEndpoint extends Endpoint {
-  type Data = File
+trait AvatarEndpoint extends file.FileEndpoint {
+  def create = ??? // create a temp file to hold the avatar
   val url: String
 }
 
 case class CachedAvatar(url: String) extends AvatarEndpoint {
-  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // read file from disk
   override val priority = Seq(1) // try before RemoteAvatar
+  case object CacheMiss extends Exception
+  // return the file if it exists, otherwise throw an exception
+  protected def fetch(implicit ec: ExecutionContext) =
+    Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
 }
 
-case class RemoteAvatar(url: String) extends AvatarEndpoint {
-  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // download file from the net and cache it
+case class RemoteAvatar(url: String)
+  extends AvatarEndpoint
+  with http.HttpEndpoint
+  with http.DispatchFileClient {
+  
+  def fetch(implicit ec: ExecutionContext): Future[File] = client(create)
 }
 ```
 
@@ -90,7 +97,7 @@ A concrete example of a `Fulfillable` is a `Need`. The `Need[A]` describes how t
 a number of `Endpoint`s:
 
 ```scala
-case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
+case class NeedBook(id: String) extends Need[Book] with rest.Probing[Book] {
   // list endpoints
   use(RemoteBook(id), LocalBook(id))
   
@@ -102,7 +109,7 @@ case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   from {
     // using pattern matching
     // (we say that a book is downloadable from LocalBook with the same id)
-    case b @ LocalBook(i) if i == id ⇒ b.asFulfillable[Book]
+    case b @ LocalBook(`id`) ⇒ b.probe
   }
 }
 ```
@@ -165,29 +172,36 @@ object Book {
 // baking in some conventions and an http client
 abstract class SingleResource(val path: String)
   extends rest.SingleResourceEndpoint
-  with rest.DispatchClient
+  with http.DispatchJsonClient
 
 case class RemoteBook(id: String) extends SingleResource("/webservice/api/books")
 
 case class RemoteAuthor(id: String) extends SingleResource("/webservice/api/authors")
 
-trait AvatarEndpoint extends Endpoint {
-  type Data = File
+trait AvatarEndpoint extends file.FileEndpoint {
+  def create = ??? // create a temp file to hold the avatar
   val url: String
 }
 
 case class CachedAvatar(url: String) extends AvatarEndpoint {
-  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // read file from disk
   override val priority = Seq(1) // try before RemoteAvatar
+  case object CacheMiss extends Exception
+  // return the file if it exists, otherwise throw an exception
+  protected def fetch(implicit ec: ExecutionContext) =
+    Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
 }
 
-case class RemoteAvatar(url: String) extends AvatarEndpoint {
-  def fetch(implicit ec: ExecutionContext): Future[File] = ??? // download file from the net and cache it
+case class RemoteAvatar(url: String)
+  extends AvatarEndpoint
+  with http.HttpEndpoint
+  with http.DispatchFileClient {
+  
+  def fetch(implicit ec: ExecutionContext): Future[File] = client(create)
 }
 
 /* Needs */
 
-case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
+case class NeedBook(id: String) extends Need[Book] with rest.Probing[Book] {
   // list endpoints
   use {
     RemoteBook(id)
@@ -199,7 +213,7 @@ case class NeedBook(id: String) extends Need[Book] with rest.RestNeed[Book] {
   }
 }
 
-case class NeedAuthor(id: String) extends Need[Author] with rest.RestNeed[Author] {
+case class NeedAuthor(id: String) extends Need[Author] with rest.Probing[Author] {
   use {
     RemoteAuthor(id)
   }
@@ -213,7 +227,7 @@ case class NeedAvatar(url: String) extends Need[File] {
   from {
     // here we don’t use the REST sugar as above
     // but there will be some sweet File support in the future
-    case e: AvatarEndpoint if e.url == url ⇒ e.asFulfillable
+    case e: AvatarEndpoint if e.url == url ⇒ e.probe
   }
 }
 
@@ -230,5 +244,5 @@ Experimental. But already published...
 ```scala
 resolvers += "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
 
-libraryDependencies += "org.needs" %% "needs" % "1.0.0-20131206-1"
+libraryDependencies += "org.needs" %% "needs" % "1.0.0-20131212"
 ```
