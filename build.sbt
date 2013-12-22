@@ -2,7 +2,7 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "1.0.0-20131212"
+version := "1.0.0-RC1"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
@@ -13,13 +13,12 @@ autoCompilerPlugins := true
 scalacOptions += "-feature"
 
 resolvers ++= Seq(
-  Resolver.sonatypeRepo("snapshots"),
   "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
 )
 
 libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-  compilerPlugin("org.scala-lang.plugins" % "macro-paradise" % "2.0.0-SNAPSHOT" cross CrossVersion.full)
+  compilerPlugin("org.scalamacros" % "paradise" % "2.0.0-M1" cross CrossVersion.full)
 )
 
 libraryDependencies ++= Seq(

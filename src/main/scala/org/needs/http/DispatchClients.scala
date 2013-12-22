@@ -14,6 +14,8 @@ trait DispatchJsonClient extends DispatchClient { self: HttpEndpoint with JsonEn
 }
 
 trait DispatchFileClient extends DispatchClient { self: HttpEndpoint with FileEndpoint ⇒
-  def client(url: String, query: Map[String, String] = Map.empty)(implicit ec: ExecutionContext) =
-    Http((dispatch.url(url) <<? query) > dispatch.as.File(create))
+  def client(url: String, query: Map[String, String] = Map.empty)(implicit ec: ExecutionContext) = {
+    val f = create
+    Http((dispatch.url(url) <<? query) > dispatch.as.File(f)).map(_ ⇒ f)
+  }
 }

@@ -6,6 +6,7 @@ import play.api.libs.functional.syntax._
 import org.scalatest.FlatSpec
 import org.needs.json.JsonEndpoint
 import org.needs.http.{DispatchJsonClient, HttpEndpoint, DispatchClient}
+import java.io.File
 
 /* Data model */
 
@@ -87,6 +88,21 @@ case class RemoteAuthors(ids: Set[String]) extends DispatchMultipleResource("htt
 case class LocalStory(id: String) extends LocalSingleResource with Local
 case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories")
 
+case class RemoteMedia(url: String)
+  extends HttpEndpoint with file.FileEndpoint with http.DispatchFileClient with Logging {
+  def create = new File(s"${url.replace("/", "-")}")
+  protected def fetch(implicit ec: ExecutionContext) =
+    client(s"http://routestory.herokuapp.com/api/stories/$url")
+}
+
+case class LocalMedia(url: String)
+  extends file.FileEndpoint with Local with Logging {
+  case object CacheMiss extends Exception
+  def create = new File(s"${url.replace("/", "-")}")
+  protected def fetch(implicit ec: ExecutionContext) =
+    Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
+}
+
 /* Needs */
 
 case class NeedAuthor(id: String) extends Need[Author] with rest.Probing[Author] {
@@ -118,9 +134,19 @@ case class NeedLatest(count: Int) extends json.SelfFulfillingNeed[Latest] with H
     client("http://routestory.herokuapp.com/api/stories/latest", Map("limit" → count.toString))
 }
 
+case class NeedMedia(url: String) extends Need[File] {
+  use { RemoteMedia(url) }
+  use { LocalMedia(url) }
+  from {
+    case e @ LocalMedia(`url`) ⇒ e.probe
+    case e @ RemoteMedia(`url`) ⇒ e.probe
+  }
+}
+
 class NeedsSpec extends FlatSpec {
   it should "do smth" in {
     import scala.concurrent.ExecutionContext.Implicits.global
+    //NeedMedia("story-zwAsEW54BBCt6kTCvmoaNA/audio/2.aac").go onComplete println
     NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
     NeedLatest(5).go onComplete println
     (NeedAuthor("author-7sKtNqyebaTECWmr5LAJC") and NeedAuthor("author-QgMggevaDcYNRE8Aov3rY")).tupled.go onComplete println
