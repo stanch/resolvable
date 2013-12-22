@@ -42,11 +42,11 @@ and [(JSON) deserialization](#deserialization).
 Endpoints are probably the simplest part of the equation. Let’s start by baking in some common conventions:
 
 ```scala
-abstract class SingleResource(val path: String)
+abstract class SingleResource(val baseUrl: String)
   extends rest.SingleResourceEndpoint
   with http.DispatchJsonClient
   
-abstract class MultipleResources(val path: String)
+abstract class MultipleResources(val baseUrl: String)
   extends rest.MultipleResourceEndpoint
   with http.DispatchJsonClient
 
@@ -68,20 +68,19 @@ trait AvatarEndpoint extends file.FileEndpoint {
   val url: String
 }
 
-case class CachedAvatar(url: String) extends AvatarEndpoint {
-  override val priority = Seq(1) // try before RemoteAvatar
-  case object CacheMiss extends Exception
-  // return the file if it exists, otherwise throw an exception
-  protected def fetch(implicit ec: ExecutionContext) =
-    Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
+case class CachedAvatar(url: String)
+  extends AvatarEndpoint
+  with file.LocalFileEndpoint {
+  
+  override val priority = Seq(1) // probe before RemoteAvatar
 }
 
 case class RemoteAvatar(url: String)
   extends AvatarEndpoint
-  with http.HttpEndpoint
+  with file.HttpFileEndpoint
   with http.DispatchFileClient {
   
-  def fetch(implicit ec: ExecutionContext): Future[File] = client(create)
+  val baseUrl = "/webservice/files" // file will be loaded from /sebservice/files/:url
 }
 ```
 
@@ -170,7 +169,7 @@ object Book {
 /* Endpoints */
 
 // baking in some conventions and an http client
-abstract class SingleResource(val path: String)
+abstract class SingleResource(val baseUrl: String)
   extends rest.SingleResourceEndpoint
   with http.DispatchJsonClient
 
@@ -183,20 +182,19 @@ trait AvatarEndpoint extends file.FileEndpoint {
   val url: String
 }
 
-case class CachedAvatar(url: String) extends AvatarEndpoint {
-  override val priority = Seq(1) // try before RemoteAvatar
-  case object CacheMiss extends Exception
-  // return the file if it exists, otherwise throw an exception
-  protected def fetch(implicit ec: ExecutionContext) =
-    Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
+case class CachedAvatar(url: String)
+  extends AvatarEndpoint
+  with file.LocalFileEndpoint {
+  
+  override val priority = Seq(1) // probe before RemoteAvatar
 }
 
 case class RemoteAvatar(url: String)
   extends AvatarEndpoint
-  with http.HttpEndpoint
+  with file.HttpFileEndpoint
   with http.DispatchFileClient {
   
-  def fetch(implicit ec: ExecutionContext): Future[File] = client(create)
+  val baseUrl = "/webservice/files" // file will be loaded from /sebservice/files/:url
 }
 
 /* Needs */
@@ -226,7 +224,8 @@ case class NeedAvatar(url: String) extends Need[File] {
   use(CachedAvatar(url), RemoteAvatar(url))
   from {
     // here we don’t use the REST sugar as above
-    // but there will be some sweet File support in the future
+    // in general, file APIs are more diverse
+    // let me know, if you can come up with a good abstraction
     case e: AvatarEndpoint if e.url == url ⇒ e.probe
   }
 }
@@ -239,10 +238,19 @@ This looks like a lot of code, but now if you want to add another endpoint, you 
 
 ### Status
 
-Experimental. But already published...
+RC1!
 
 ```scala
 resolvers += "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
 
-libraryDependencies += "org.needs" %% "needs" % "1.0.0-20131212"
+libraryDependencies += "org.needs" %% "needs" % "1.0.0-RC1"
 ```
+
+### Cake baking cookbook
+
+This section will be expanded with more detailed info and scaladoc links.
+
+* `json`: `JsonEndpoint`
+* `http`: `HttpEndpoint` and two optional clients: [Dispatch](https://github.com/stanch/needs/blob/master/src/main/scala/org/needs/http/DispatchClients.scala) and [AndroidAsync](https://github.com/stanch/needs/blob/master/src/main/scala/org/needs/http/AndroidClients.scala)
+* `file`: `FileEndpoint`, `LocalFileEndpoint`, `HttpFileEndpoint` (see [code](https://github.com/stanch/needs/blob/master/src/main/scala/org/needs/file/Endpoints.scala))
+* `rest`: A mix of JSON and HTTP with reasonable conventions
