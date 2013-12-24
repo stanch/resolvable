@@ -243,7 +243,7 @@ RC1!
 ```scala
 resolvers += "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
 
-libraryDependencies += "org.needs" %% "needs" % "1.0.0-RC1"
+libraryDependencies += "org.needs" %% "needs" % "1.0.0-RC2"
 ```
 
 ### Cake baking cookbook
