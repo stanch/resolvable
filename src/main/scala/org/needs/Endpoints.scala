@@ -23,11 +23,12 @@ trait Endpoint {
   }
 
   /** Tells if the fetching process has started */
-  final def isFetched = _fetched.synchronized(_fetched.isDefined)
+  final def isFetched = _fetchingLock.synchronized(_fetched.isDefined)
 
   // all this could be a lazy val, if not for the ExecutionContext
+  final private val _fetchingLock = new Object
   final private var _fetched: Option[Future[Data]] = None
-  final protected def data(implicit ec: ExecutionContext) = _fetched.synchronized {
+  final protected def data(implicit ec: ExecutionContext) = _fetchingLock.synchronized {
     if (_fetched.isEmpty) {
       logFetching()
       _fetched = Some(fetch)

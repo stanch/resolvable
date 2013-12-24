@@ -57,9 +57,9 @@ trait Need[A] extends Fulfillable[A] {
     }(ec)
   }
 
-  protected lazy val sources = default
+  lazy val sources = default
 
-  protected def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
+  def addOptimal(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
     optimizations(endpoints, ec)
 
   /** Fulfill the need using the specified endpoints */

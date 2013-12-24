@@ -147,8 +147,9 @@ class NeedsSpec extends FlatSpec {
   it should "do smth" in {
     import scala.concurrent.ExecutionContext.Implicits.global
     //NeedMedia("story-zwAsEW54BBCt6kTCvmoaNA/audio/2.aac").go onComplete println
-    NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
-    NeedLatest(5).go onComplete println
-    (NeedAuthor("author-7sKtNqyebaTECWmr5LAJC") and NeedAuthor("author-QgMggevaDcYNRE8Aov3rY")).tupled.go onComplete println
+    //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
+    NeedStory("story-DLMwDHAyDknJxvidn4G6pA").flatMap(_ ⇒ NeedLatest(5)).go onComplete println
+    //NeedLatest(5).go onComplete println
+    //(NeedAuthor("author-7sKtNqyebaTECWmr5LAJC") and NeedAuthor("author-QgMggevaDcYNRE8Aov3rY")).tupled.go onComplete println
   }
 }
