@@ -238,7 +238,7 @@ This looks like a lot of code, but now if you want to add another endpoint, you 
 
 ### Status
 
-RC1!
+RC2!
 
 ```scala
 resolvers += "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
