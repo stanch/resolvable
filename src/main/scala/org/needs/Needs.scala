@@ -5,10 +5,16 @@ import scala.language.existentials
 import scala.concurrent.{Future, ExecutionContext}
 import scala.async.Async._
 import play.api.libs.functional.syntax._
+import java.io.{PrintWriter, StringWriter, PrintStream}
 
 /** Holds an exception encountered during probing an endpoint */
 case class Probed(endpoint: Endpoint, got: Throwable) {
-  override def toString = s"$endpoint, got $got"
+  override def toString = {
+    val writer = new StringWriter
+    val trace = new PrintWriter(writer)
+    got.printStackTrace(trace)
+    s"$endpoint, got $writer"
+  }
 }
 
 /** Holds an unfulfilled Need */

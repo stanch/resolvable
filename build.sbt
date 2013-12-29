@@ -2,7 +2,7 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "1.0.0-RC2"
+version := "1.0.0-RC3"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
