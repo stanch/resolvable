@@ -4,9 +4,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import org.scalatest.FlatSpec
-import org.needs.json.JsonEndpoint
-import org.needs.http.{DispatchJsonClient, HttpEndpoint, DispatchClient}
+import org.needs.json.{HttpJsonEndpoint, JsonEndpoint}
+import org.needs.http.{HttpClient, HttpEndpoint, DispatchClient}
 import java.io.File
+import org.needs.file.HttpFileEndpoint
 
 /* Data model */
 
@@ -65,13 +66,15 @@ trait Logging { self: Endpoint ⇒
   }
 }
 
-trait RestBase extends DispatchJsonClient with Logging { self: HttpEndpoint with JsonEndpoint ⇒ }
+trait HttpBase extends Logging { self: HttpEndpoint ⇒
+  def client: HttpClient = new DispatchClient
+}
 
 abstract class DispatchSingleResource(val baseUrl: String)
-  extends rest.SingleResourceEndpoint with RestBase
+  extends rest.SingleResourceEndpoint with HttpBase
 
 abstract class DispatchMultipleResource(val baseUrl: String)
-  extends rest.MultipleResourceEndpoint with RestBase
+  extends rest.MultipleResourceEndpoint with HttpBase
 
 abstract class LocalSingleResource extends JsonEndpoint {
   def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
@@ -89,10 +92,9 @@ case class LocalStory(id: String) extends LocalSingleResource with Local
 case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories")
 
 case class RemoteMedia(url: String)
-  extends HttpEndpoint with file.FileEndpoint with http.DispatchFileClient with Logging {
+  extends HttpFileEndpoint with HttpBase {
   def create = new File(s"${url.replace("/", "-")}")
-  protected def fetch(implicit ec: ExecutionContext) =
-    client(s"http://routestory.herokuapp.com/api/stories/$url")
+  val baseUrl = "http://routestory.herokuapp.com/api/stories"
 }
 
 case class LocalMedia(url: String)
@@ -129,9 +131,9 @@ case class NeedStory(id: String) extends Need[Story] with rest.Probing[Story] {
   }
 }
 
-case class NeedLatest(count: Int) extends json.SelfFulfillingNeed[Latest] with HttpEndpoint with RestBase {
+case class NeedLatest(count: Int) extends json.SelfFulfillingNeed[Latest] with HttpJsonEndpoint with HttpBase {
   def fetch(implicit ec: ExecutionContext) =
-    client("http://routestory.herokuapp.com/api/stories/latest", Map("limit" → count.toString))
+    client.getJson("http://routestory.herokuapp.com/api/stories/latest", Map("limit" → count.toString))
 }
 
 case class NeedMedia(url: String) extends Need[File] {
