@@ -30,6 +30,7 @@ case class Chagrin(needs: List[Unfulfilled])
 trait Need[A] extends Fulfillable[A] {
   private var default: EndpointPool = EndpointPool.empty
   private var probes: PartialFunction[Endpoint, Fulfillable[A]] = PartialFunction.empty
+  private var priority: EndpointPriority = EndpointPriority.none
   private var optimizations: (EndpointPool, ExecutionContext) ⇒ Future[EndpointPool] = (points, ec) ⇒ Future.successful(points)
 
   /** Add endpoints */
@@ -40,6 +41,16 @@ trait Need[A] extends Fulfillable[A] {
   /** Define how to fulfill the need by probing a particular endpoint */
   def from(how: PartialFunction[Endpoint, Fulfillable[A]]) {
     probes = probes orElse how
+  }
+
+  /** Define endpoint priority.
+    * Priority of each endpoint has type Seq[Int] and follows these rules:
+    * - Seq(a, b, c, d, x, ...) < Seq(a, b, c, d, y, ...) if x < y
+    * - Seq(a, b, c, d) < Seq(a, b, c, d, ...)
+    * Default priority is Seq(0, 0).
+    */
+  def prioritize(how: PartialFunction[Endpoint, Seq[Int]]) {
+    priority = EndpointPriority(how orElse priority.priority)
   }
 
   /** Optimize fulfillment by adding aggregated endpoints.
@@ -70,7 +81,7 @@ trait Need[A] extends Fulfillable[A] {
 
   /** Fulfill the need using the specified endpoints */
   def fulfill(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
-    val it = endpoints.iterator
+    val it = endpoints.iterator(priority)
     var found: Option[A] = None
     var probed: List[Probed] = Nil
     while (it.hasNext && found.isEmpty) {

@@ -10,5 +10,5 @@ trait HttpClient {
 }
 
 trait HttpEndpoint extends Endpoint {
-  def client: HttpClient
+  val client: HttpClient
 }

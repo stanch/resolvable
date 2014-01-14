@@ -60,14 +60,18 @@ object Latest {
 
 /* Endpoints */
 
-trait Logging { self: Endpoint ⇒
-  override protected def logFetching() {
-    println(s"--> Downloading $this")
+object Logger extends EndpointLogger {
+  def logFetching(pt: Endpoint) = {
+    println(s"--> Downloading $pt")
   }
 }
 
+trait Logging { self: Endpoint ⇒
+  val logger = Logger
+}
+
 trait HttpBase extends Logging { self: HttpEndpoint ⇒
-  def client: HttpClient = new DispatchClient
+  val client = new DispatchClient
 }
 
 abstract class DispatchSingleResource(val baseUrl: String)
@@ -76,20 +80,21 @@ abstract class DispatchSingleResource(val baseUrl: String)
 abstract class DispatchMultipleResource(val baseUrl: String)
   extends rest.MultipleResourceEndpoint with HttpBase
 
-abstract class LocalSingleResource extends JsonEndpoint {
+abstract class LocalSingleResource extends JsonEndpoint with Logging {
   def fetch(implicit ec: ExecutionContext) = Future.failed[JsValue](new Exception)
 }
 
-trait Local { self: Endpoint ⇒ override val priority = Seq(1) }
+case class LocalAuthor(id: String)
+  extends LocalSingleResource
+case class RemoteAuthor(id: String)
+  extends DispatchSingleResource("http://routestory.herokuapp.com/api/authors")
+case class RemoteAuthors(ids: Set[String])
+  extends DispatchMultipleResource("http://routestory.herokuapp.com/api/authors")
 
-case class LocalAuthor(id: String) extends LocalSingleResource with Local
-case class RemoteAuthor(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/authors")
-case class RemoteAuthors(ids: Set[String]) extends DispatchMultipleResource("http://routestory.herokuapp.com/api/authors") {
-  override val priority = Seq(0, ids.size)
-}
-
-case class LocalStory(id: String) extends LocalSingleResource with Local
-case class RemoteStory(id: String) extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories")
+case class LocalStory(id: String)
+  extends LocalSingleResource
+case class RemoteStory(id: String)
+  extends DispatchSingleResource("http://routestory.herokuapp.com/api/stories")
 
 case class RemoteMedia(url: String)
   extends HttpFileEndpoint with HttpBase {
@@ -98,11 +103,8 @@ case class RemoteMedia(url: String)
 }
 
 case class LocalMedia(url: String)
-  extends file.FileEndpoint with Local with Logging {
-  case object CacheMiss extends Exception
+  extends file.LocalFileEndpoint with Logging {
   def create = new File(s"${url.replace("/", "-")}")
-  protected def fetch(implicit ec: ExecutionContext) =
-    Option(create).filter(_.exists()).map(Future.successful).getOrElse(Future.failed(CacheMiss))
 }
 
 /* Needs */
@@ -110,6 +112,11 @@ case class LocalMedia(url: String)
 case class NeedAuthor(id: String) extends Need[Author] with rest.Probing[Author] {
   use { LocalAuthor(id) }
   use { RemoteAuthor(id) }
+
+  prioritize {
+    case LocalAuthor(_) ⇒ Seq(1)
+    case RemoteAuthors(ids) ⇒ Seq(0, ids.size)
+  }
 
   from {
     singleResource[RemoteAuthor]
@@ -124,7 +131,6 @@ case class NeedAuthor(id: String) extends Need[Author] with rest.Probing[Author]
 }
 
 case class NeedStory(id: String) extends Need[Story] with rest.Probing[Story] {
-  use { LocalStory(id) }
   use { RemoteStory(id) }
   from {
     singleResource[RemoteStory]
@@ -139,6 +145,9 @@ case class NeedLatest(count: Int) extends json.SelfFulfillingNeed[Latest] with H
 case class NeedMedia(url: String) extends Need[File] {
   use { RemoteMedia(url) }
   use { LocalMedia(url) }
+  prioritize {
+    case LocalMedia(_) ⇒ Seq(1)
+  }
   from {
     case e @ LocalMedia(`url`) ⇒ e.probe
     case e @ RemoteMedia(`url`) ⇒ e.probe
