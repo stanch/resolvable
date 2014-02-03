@@ -2,7 +2,7 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "1.0.0-RC5"
+version := "2.0.0-M1"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
@@ -13,7 +13,8 @@ autoCompilerPlugins := true
 scalacOptions += "-feature"
 
 resolvers ++= Seq(
-  "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
+  "Stanch@bintray" at "http://dl.bintray.com/stanch/maven",
+  Resolver.file("local-play", file("c:/projects/Play20/repository/local"))(Resolver.ivyStylePatterns)
 )
 
 libraryDependencies ++= Seq(
@@ -22,7 +23,7 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-json" % "2.2.0",
+  "com.typesafe.play" %% "play-json" % "2.3-SNAPSHOT",
   "org.needs" %% "play-functional-extras" % "1.0.0",
   "org.scala-lang.modules" %% "scala-async" % "0.9.0-M4",
   "org.scalatest" %% "scalatest" % "2.0" % "test"

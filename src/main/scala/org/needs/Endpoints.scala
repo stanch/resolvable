@@ -2,7 +2,7 @@ package org.needs
 
 import scala.concurrent.{ExecutionContext, Future}
 
-/** An Endpoint represents something that can deliver data */
+/** Represents something that can deliver data */
 trait Endpoint {
   /** Data type of the endpoint */
   type Data
@@ -10,14 +10,8 @@ trait Endpoint {
   /** The implementation of data fetching */
   protected def fetch(implicit ec: ExecutionContext): Future[Data]
 
-  /** Endpoint logger */
-  val logger: EndpointLogger
-
-  // this is important to avoid deleting already fetched endpoints from the pool
-  def canEqual(other: Any) = other match {
-    case point: Endpoint if point.isFetched == isFetched ⇒ true
-    case _ ⇒ false
-  }
+  /** Endpoint logger. See [[EndpointLogger]] */
+  protected val logger: EndpointLogger
 
   /** Tells if the fetching process has started */
   final def isFetched = _fetchingLock.synchronized(_fetched.isDefined)
@@ -25,16 +19,15 @@ trait Endpoint {
   // all this could be a lazy val, if not for the ExecutionContext
   final private val _fetchingLock = new Object
   final private var _fetched: Option[Future[Data]] = None
-  final protected def data(implicit ec: ExecutionContext) = _fetchingLock.synchronized {
+
+  /** Fetched data */
+  final def data(implicit ec: ExecutionContext) = _fetchingLock.synchronized {
     if (_fetched.isEmpty) {
       logger.logFetching(this)
       _fetched = Some(fetch)
     }
     _fetched.get
   }
-
-  /** Returns a Fulfillable with the data */
-  def probe = Fulfillable.fromFuture(implicit ec ⇒ data)
 }
 
 /** Endpoint logger */
@@ -48,48 +41,73 @@ object EndpointLogger{
   object none extends EndpointLogger {
     def logFetching(pt: Endpoint) = ()
   }
-}
 
-/** Endpoint priority defines the order in which endpoints are probed and fetched.
-  * Priority of each endpoint has type Seq[Int] and follows these rules:
-  * - Seq(a, b, c, d, x, ...) < Seq(a, b, c, d, y, ...) if x < y
-  * - Seq(a, b, c, d) < Seq(a, b, c, d, ...)
-  * Default priority is Seq(0, 0).
-  */
-case class EndpointPriority(priority: PartialFunction[Endpoint, Seq[Int]]) {
-  def p(pt: Endpoint) = priority.lift(pt).getOrElse(Seq(0, 0))
-
-  def order(pt1: Endpoint, pt2: Endpoint) = if (pt1.isFetched != pt2.isFetched) {
-    pt1.isFetched > pt2.isFetched
-  } else {
-    val (p1, p2) = (p(pt1), p(pt2))
-    (p1 zip p2).find { case (x, y) ⇒ x != y } match {
-      case Some((x, y)) ⇒ x > y
-      case None ⇒ p1.size > p2.size
-    }
+  /** An endpoint logger that uses println */
+  def println(prefix: String = "--> Fetching") = new EndpointLogger {
+    def logFetching(pt: Endpoint) = Predef.println(s"$prefix $pt")
   }
 }
 
-object EndpointPriority {
-  /** Uses default priority for all endpoints */
-  val none = EndpointPriority(PartialFunction.empty)
+/** Adds more optimal endpoints, e.g. bulk requests */
+final case class EndpointPoolOptimizer(addOptimal: (EndpointPool, ExecutionContext) ⇒ Future[EndpointPool]) {
+  def andThen(that: EndpointPoolOptimizer) = EndpointPoolOptimizer { (pool, ec) ⇒
+    addOptimal(pool, ec).flatMap(that.addOptimal(_, ec))(ec)
+  }
 }
 
-/** An EndpointPool is a collection of Endpoints */
-class EndpointPool(protected val endpoints: Set[Endpoint]) {
-  def +(endpoint: Endpoint) = new EndpointPool(this.endpoints + endpoint)
-  def ++(endpoints: Seq[Endpoint]) = new EndpointPool(this.endpoints ++ endpoints)
+object EndpointPoolOptimizer {
+  /** An optimizer that does nothing */
+  def none = EndpointPoolOptimizer((x, _) ⇒ Future.successful(x))
+  def future(in: ExecutionContext ⇒ Future[EndpointPoolOptimizer]) = EndpointPoolOptimizer { (pool, ec) ⇒
+    in(ec).flatMap(_.addOptimal(pool, ec))(ec)
+  }
+
+  def chain(optimizers: Seq[EndpointPoolOptimizer]) = optimizers.fold(none)(_ andThen _)
+}
+
+final case class EndpointPoolInitiator(initPool: ExecutionContext ⇒ Future[EndpointPool]) {
+  def +(that: EndpointPoolInitiator) = EndpointPoolInitiator { implicit ec ⇒
+    initPool(ec).zip(that.initPool(ec)) map { case (x, y) ⇒ x ++ y }
+  }
+}
+
+object EndpointPoolInitiator {
+  def none = EndpointPoolInitiator(_ ⇒ Future.successful(EndpointPool.empty))
+  def apply(pool: EndpointPool): EndpointPoolInitiator = EndpointPoolInitiator(_ ⇒ Future.successful(pool))
+  def future(in: ExecutionContext ⇒ Future[EndpointPoolInitiator]) = EndpointPoolInitiator { ec ⇒
+    in(ec).flatMap(_.initPool(ec))(ec)
+  }
+
+  def merge(initiators: Seq[EndpointPoolInitiator]) = initiators.fold(none)(_ + _)
+}
+
+/** A pool of endpoints */
+final class EndpointPool(protected val endpoints: Set[EndpointPool.Entry]) {
+  def +(endpoint: Endpoint) = new EndpointPool(this.endpoints + EndpointPool.Entry(endpoint))
+  def ++(endpoints: Seq[Endpoint]) = new EndpointPool(this.endpoints ++ endpoints.map(EndpointPool.Entry))
   def ++(pool: EndpointPool) = new EndpointPool(this.endpoints ++ pool.endpoints)
-  def fold[A](z: A)(f: (A, Endpoint) ⇒ A) = endpoints.foldLeft[A](z)(f)
-  def iterator(priority: EndpointPriority) = endpoints.toList.sortWith(priority.order).iterator
+  def fold[A](z: A)(f: (A, Endpoint) ⇒ A) = endpoints.foldLeft[A](z) { case (x, e) ⇒ f(x, e.endpoint) }
+  def select[A](f: Endpoint ⇒ Option[A]) = endpoints flatMap {
+    case EndpointPool.Entry(p) ⇒ Set(Some(p).zip(f(p)).toSeq: _*)
+  }
 
   override def toString = {
-    val points = endpoints.toList map { e ⇒ (if (e.isFetched) "*" else "") + e.toString }
+    val points = endpoints.toList map { e ⇒ (if (e.endpoint.isFetched) "*" else "") + e.toString }
     s"Endpoints(${points.mkString(", ")})"
   }
 }
 
 object EndpointPool {
+  /** A wrapper class to ensure that an already fetched endpoint can’t equal an otherwise identical non-fetched one */
+  final case class Entry(endpoint: Endpoint) {
+    def canEqual(other: Any) = other match {
+      case Entry(point) if point.isFetched == endpoint.isFetched ⇒ true
+      case _ ⇒ false
+    }
+  }
+
+  def apply(endpoint: Endpoint) = new EndpointPool(Set(Entry(endpoint)))
+  def apply(endpoints: Seq[Endpoint]) = new EndpointPool(Set(endpoints.map(Entry): _*))
   def empty = new EndpointPool(Set.empty)
-  def merge(pools: List[EndpointPool]) = pools.fold(EndpointPool.empty)(_ ++ _)
+  def merge(pools: Seq[EndpointPool]) = pools.fold(EndpointPool.empty)(_ ++ _)
 }

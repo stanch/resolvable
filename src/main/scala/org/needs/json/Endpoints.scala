@@ -1,15 +1,12 @@
 package org.needs.json
 
-import org.needs.{Fulfillable, Endpoint}
+import org.needs._
 import play.api.libs.json._
 import org.needs.http.{HttpClient, HttpEndpoint}
 import scala.concurrent.ExecutionContext
 
 trait JsonEndpoint extends Endpoint {
   type Data = JsValue
-
-  def probeAs[A](implicit reads: Reads[Fulfillable[A]]) =
-    Fulfillable.jumpFuture(implicit ec ⇒ data.map(_.as[Fulfillable[A]]))
 }
 
 trait HttpJsonEndpoint extends JsonEndpoint with HttpEndpoint {
