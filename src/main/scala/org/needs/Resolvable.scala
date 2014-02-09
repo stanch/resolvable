@@ -10,7 +10,7 @@ import play.api.libs.functional.{Functor, Applicative}
 import play.api.data.mapping.Rule
 
 /** Resolvable is something that can be fetched using a pool of Endpoints */
-trait Resolvable[A] {
+trait Resolvable[+A] {
   /** Enables resolution by adding default endpoints */
   val initiator: EndpointPoolInitiator
 
@@ -30,7 +30,7 @@ trait Resolvable[A] {
   final def flatMap[B](f: A ⇒ Resolvable[B]): Resolvable[B] = FlatMappedResolvable(this, f)
 
   /** Provide an alternative */
-  final def orElse(alternative: Resolvable[A]): Resolvable[A] = AlternativeResolvable(this, alternative)
+  final def orElse[B >: A](alternative: Resolvable[B]): Resolvable[B] = AlternativeResolvable(this, alternative)
 }
 
 final case class MappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ B) extends Resolvable[B] {
@@ -49,7 +49,7 @@ final case class FlatMappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ Resolvab
   }
 }
 
-final case class AlternativeResolvable[A](m1: Resolvable[A], m2: Resolvable[A]) extends Resolvable[A] {
+final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolvable[B]) extends Resolvable[B] {
   val initiator = m1.initiator + m2.initiator
   val optimizer = m1.optimizer andThen m2.optimizer
   // TODO: concatenate failures
