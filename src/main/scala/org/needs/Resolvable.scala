@@ -107,7 +107,7 @@ final case class OptionResolvable[A](in: Option[Resolvable[A]]) extends Resolvab
     in.map(_.resolve(endpoints).map(Some.apply)).getOrElse(Future.successful(None))
 }
 
-object EndpointResolvable {
+object EndpointDataResolvable {
   def apply[A, E <: Endpoint](in: E)(implicit rule: Rule[E#Data, Resolvable[A]]): Resolvable[A] =
     FutureResolvable { implicit ec ⇒ in.data.map(rule.validate).map(_.get) }
 

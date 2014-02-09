@@ -48,11 +48,11 @@ object Source {
 class SourceBuilder[A] {
   def from[E <: Endpoint](endpoint: E)(implicit rule: Rule[E#Data, Resolvable[A]]): Resolvable[A] =
     Source(endpoint) {
-      case pt @ `endpoint` ⇒ EndpointResolvable[A, E](pt)
+      case pt @ `endpoint` ⇒ EndpointDataResolvable[A, E](pt)
     }
 
   def fromPath[E <: Endpoint, D](endpoint: E)(path: E#Data ⇒ D)(implicit rule: Rule[D, Resolvable[A]]): Resolvable[A] =
     Source(endpoint) {
-      case pt @ `endpoint` ⇒ EndpointResolvable[A, E, D](pt)(path)
+      case pt @ `endpoint` ⇒ EndpointDataResolvable[A, E, D](pt)(path)
     }
 }
