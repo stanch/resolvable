@@ -3,7 +3,6 @@ package org.needs
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import play.api.data.mapping.{Rule, From}
 import play.api.data.mapping.json.Rules._
 import org.scalatest.FlatSpec
 import org.needs.json.HttpJsonEndpoint
@@ -26,44 +25,36 @@ import org.needs.file.HttpFileEndpoint
 
 case class Author(id: String, name: String, picture: File)
 object Author {
-  implicit val rule = From[JsValue] { __ ⇒
-    Resolvable.rule[JsValue, Author] {
-      (__ \ "id").read[String] and
-      (__ \ "name").read[String] and
-      (__ \ "picture").read[String].fmap(Needs.picture)
-    }
+  implicit val rule = Resolvable.rule[JsValue, Author] { __ ⇒
+    (__ \ "id").read[String] and
+    (__ \ "name").read[String] and
+    (__ \ "picture").read[String].fmap(Needs.picture)
   }
 }
 
 case class Story(id: String, name: String, author: Author)
 object Story {
-  implicit val rule = From[JsValue] { __ ⇒
-    Resolvable.rule[JsValue, Story] {
-      (__ \ "_id").read[String] and
-      (__ \ "meta" \ "title").read[String] and
-      (__ \ "authorId").read[String].fmap(Needs.author)
-    }
+  implicit val rule = Resolvable.rule[JsValue, Story] { __ ⇒
+    (__ \ "_id").read[String] and
+    (__ \ "meta" \ "title").read[String] and
+    (__ \ "authorId").read[String].fmap(Needs.author)
   }
 }
 
 case class StoryPreview(id: String, name: String, author: Author)
 object StoryPreview {
-  implicit val rule = From[JsValue] { __ ⇒
-    Resolvable.rule[JsValue, StoryPreview] {
-      (__ \ "id").read[String] and
-      (__ \ "value" \ "title").read[String] and
-      (__ \ "value" \ "authorId").read[String].fmap(Needs.author)
-    }
+  implicit val rule = Resolvable.rule[JsValue, StoryPreview] { __ ⇒
+    (__ \ "id").read[String] and
+    (__ \ "value" \ "title").read[String] and
+    (__ \ "value" \ "authorId").read[String].fmap(Needs.author)
   }
 }
 
 case class Latest(totalRows: Int, stories: List[StoryPreview])
 object Latest {
-  implicit val rule = From[JsValue] { __ ⇒
-    Resolvable.rule[JsValue, Latest] {
-      (__ \ "total_rows").read[Int] and
-      (__ \ "rows").read[List[Resolvable[StoryPreview]]].fmap(Resolvable.jumpList)
-    }
+  implicit val rule = Resolvable.rule[JsValue, Latest] { __ ⇒
+    (__ \ "total_rows").read[Int] and
+    (__ \ "rows").read[List[Resolvable[StoryPreview]]].fmap(Resolvable.jumpList)
   }
 }
 
@@ -111,8 +102,8 @@ class NeedsSpec extends FlatSpec {
     //NeedMedia("story-zwAsEW54BBCt6kTCvmoaNA/audio/2.aac").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").flatMap(_ ⇒ NeedLatest(5)).go onComplete println
-    //Needs.latest(10).go onComplete println
-    (Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV") and Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).tupled.go onComplete println
+    Needs.latest(10).go onComplete println
+    //(Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV") and Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).tupled.go onComplete println
 //    val rule = implicitly[Rule[JsValue, Resolvable[Author]]]
 //    val x = RemoteAuthor("author-bWTPRa8rCLgVAVSMNsb7QV").data.map(rule.validate).map(_.get)
 //    x foreach println

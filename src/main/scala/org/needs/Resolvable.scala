@@ -7,7 +7,7 @@ import scala.async.Async._
 import scala.util.{Failure, Success}
 import scala.reflect.macros.Context
 import play.api.libs.functional.{Functor, Applicative}
-import play.api.data.mapping.Rule
+import play.api.data.mapping.{Reader, Rule}
 
 /** A Resolution is either a pure value, or a `Resolvable` value,
   * which is propagated from the next layer of dependencies.
@@ -162,10 +162,10 @@ object Resolvable {
   import ResolvableMacros._
 
   /** Create a Rule[I, Resolvable[O]] from builder */
-  def rule[I, O](builder: Any): Rule[I, Resolvable[O]] = macro ruleImpl[I, O]
+  def rule[I, O](builder: Reader[I] ⇒ Any): Rule[I, Resolvable[O]] = macro ruleImpl[I, O]
 
   /** Create a Rule[I, Resolvable[O]] from Rule[I, O] */
-  implicit def rule[I, O](implicit rule: Rule[I, O]): Rule[I, Resolvable[O]] = rule.fmap(PureResolvable.apply)
+  implicit def pureRule[I, O](implicit rule: Rule[I, O]): Rule[I, Resolvable[O]] = rule.fmap(PureResolvable.apply)
 
   /** Jump over the Future monad */
   def jumpFuture[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) = FutureResolvable(in)
@@ -190,23 +190,24 @@ object Resolvable {
 }
 
 object ResolvableMacros {
-  def ruleImpl[I: c.WeakTypeTag, O: c.WeakTypeTag](c: Context)(builder: c.Expr[Any]) = {
+  def ruleImpl[I: c.WeakTypeTag, O: c.WeakTypeTag](c: Context)(builder: c.Expr[Reader[I] ⇒ Any]) = {
     import c.universe._
+    val reader = newTermName(c.fresh("reader"))
     val tupled = scala.util.Try {
-      c.typeCheck(q"{ import play.api.libs.functional.lifting._; $builder.tupled.fmap(_.liftAll[org.needs.Resolvable]) }")
+      c.typeCheck(q"{ $reader: play.api.data.mapping.Reader[${weakTypeOf[I]}] ⇒ import play.api.libs.functional.lifting._; $builder($reader).tupled.fmap(_.liftAll[org.needs.Resolvable]) }")
     } getOrElse {
       c.abort(builder.tree.pos, "Builder expected")
     }
-    val TypeRef(_, _, List(TypeRef(_, _, _), TypeRef(_, _, List(TypeRef(_, _, types))))) = tupled.tpe
+    val TypeRef(_, _, List(_, TypeRef(_, _, List(TypeRef(_, _, _), TypeRef(_, _, List(TypeRef(_, _, types))))))) = tupled.tpe
     val args = types.map(_ ⇒ c.fresh("arg"))
     val idents = args.map(a ⇒ Ident(a))
     val sign = args zip types map { case (a, t) ⇒ q"val ${newTermName(a)}: $t"}
     val res = scala.util.Try {
       val constructor = q"{ (..$sign) ⇒ ${weakTypeOf[O].typeSymbol.companionSymbol}.apply(..$idents) }.tupled"
-      c.typeCheck(q"$tupled.fmap(_.map($constructor))")
+      c.typeCheck(q"{ $reader: play.api.data.mapping.Reader[${weakTypeOf[I]}] ⇒ $tupled($reader).fmap(_.map($constructor)) }")
     } getOrElse {
       c.abort(c.enclosingPosition, s"Could not generate Rule[${weakTypeOf[I]}, Resolvable[${weakTypeOf[O]}]]")
     }
-    c.Expr[Rule[I, Resolvable[O]]](res)
+    c.Expr[Rule[I, Resolvable[O]]](q"play.api.data.mapping.From[${weakTypeOf[I]}]($res)")
   }
 }
