@@ -138,7 +138,7 @@ final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[L
   val manager = EndpointPoolManager.compose(in.map(_.manager))
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
     val points = await(manager.process(endpoints))
-    val res = await(Future.sequence(in.map { x: Resolvable[A] ⇒ x.resolve(points) }))
+    val res = await(Future.sequence(in.map(_.resolve(points))))
     // recursively pull and resolve all bottom layers
     Resolution.Result(await(Resolution.exhaustList(points, res.toList)))
   }
@@ -148,6 +148,17 @@ final case class OptionResolvable[A](in: Option[Resolvable[A]]) extends Resolvab
   val manager = in.map(_.manager).getOrElse(EndpointPoolManager.none)
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
     in.map(_.resolve(endpoints).map(_.map(Some.apply))).getOrElse(Future.successful(Resolution.Result(None)))
+}
+
+final case class DelayedResolvable[A](in: Resolvable[A]) extends Resolvable[Future[A]] {
+  val manager = in.manager
+  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful {
+    Resolution.Result(async {
+      val points = await(manager.process(endpoints))
+      val res = await(in.resolve(points))
+      await(Resolution.exhaustList(points, List(res))).head
+    })
+  }
 }
 
 object EndpointDataResolvable {
@@ -168,13 +179,18 @@ object Resolvable {
   implicit def pureRule[I, O](implicit rule: Rule[I, O]): Rule[I, Resolvable[O]] = rule.fmap(PureResolvable.apply)
 
   /** Jump over the Future monad */
-  def fromFuture[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) = FutureResolvable(in)
+  def fromFuture[A](in: ExecutionContext ⇒ Future[Resolvable[A]]): Resolvable[A] = FutureResolvable(in)
 
   /** Jump over a List */
-  def fromList[A](in: List[Resolvable[A]]) = ListResolvable(in)
+  def fromList[A](in: List[Resolvable[A]]): Resolvable[List[A]] = ListResolvable(in)
 
   /** Jump over an Option */
-  def fromOption[A](in: Option[Resolvable[A]]) = OptionResolvable(in)
+  def fromOption[A](in: Option[Resolvable[A]]): Resolvable[Option[A]] = OptionResolvable(in)
+
+  /** Delay a resolvable to get its result immediately as a `Future[Future[A]]` instead of `Future[A]`.
+    * Note that delayed resolvables *do not* cooperate with their siblings
+    */
+  def delay[A](in: Resolvable[A]): Resolvable[Future[A]] = DelayedResolvable(in)
 
   /** A Functor instance for Resolvable */
   implicit object functor extends Functor[Resolvable] {
