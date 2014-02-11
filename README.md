@@ -175,6 +175,10 @@ The example is not complete w.r.t. all the optimizations claimed above. But come
 a fictional web service. Let me know which one I should use (no API key is a must). Anyway, there is
 another *working* example [in the tests](https://github.com/stanch/needs/blob/master/src/test/scala/org/needs/NeedSpec.scala).
 
+### Other examples
+
+Some Flickr API: [endpoints](https://github.com/scala-needs/needs-flickr/blob/master/src/main/scala/org/needs/flickr/Endpoints.scala), [needs](https://github.com/scala-needs/needs-flickr/blob/master/src/main/scala/org/needs/flickr/Needs.scala), [formats](https://github.com/scala-needs/needs-flickr/blob/master/src/main/scala/org/needs/flickr/JsonFormats.scala).
+
 ### Status
 
 Version 1.0 was rewritten and abandoned at the RC5 stage. Version 2.0 is not published yet. Please stay tuned!
