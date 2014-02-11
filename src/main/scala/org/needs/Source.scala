@@ -32,7 +32,15 @@ final case class Source[A](initial: Endpoint*)(
 }
 
 object Source {
+  /** Tells whether the endpoint is suitable for the source and how to get a resolvable from it */
   type Matching[A] = PartialFunction[Endpoint, Resolvable[A]]
+
+  /** Defines the order in which endpoints are probed and fetched.
+    * Priority of each endpoint has type Seq[Int] and follows these rules:
+    * - Seq(a, b, c, d, x, ...) < Seq(a, b, c, d, y, ...) if x < y
+    * - Seq(a, b, c, d) < Seq(a, b, c, d, ...)
+    * Default priority is Seq(0).
+    */
   type Priority = PartialFunction[Endpoint, Seq[Int]]
 
   def seqOrder(p1: Seq[Int], p2: Seq[Int]) =
@@ -41,15 +49,18 @@ object Source {
       case None ⇒ p1.size > p2.size
     }
 
+  /** Create a source builder */
   def apply[A] = new SourceBuilder[A]
 }
 
 class SourceBuilder[A] {
+  /** A source fetched from `endpoint.data` */
   def from[E <: Endpoint](endpoint: E)(implicit rule: Rule[E#Data, Resolvable[A]]): Resolvable[A] =
     Source(endpoint) {
       case pt @ `endpoint` ⇒ EndpointDataResolvable[A, E](pt)
     }
 
+  /** A source fetched from `endpoint.data`, mapped onto `path` */
   def fromPath[E <: Endpoint, D](endpoint: E)(path: E#Data ⇒ D)(implicit rule: Rule[D, Resolvable[A]]): Resolvable[A] =
     Source(endpoint) {
       case pt @ `endpoint` ⇒ EndpointDataResolvable[A, E, D](pt)(path)

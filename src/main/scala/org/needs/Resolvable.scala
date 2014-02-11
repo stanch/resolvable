@@ -9,6 +9,9 @@ import scala.reflect.macros.Context
 import play.api.libs.functional.{Functor, Applicative}
 import play.api.data.mapping.Rule
 
+/** A Resolution is either a pure value, or a `Resolvable` value,
+  * which is propagated from the next layer of dependencies.
+  * */
 sealed trait Resolution[+A] {
   def map[B](f: A ⇒ B): Resolution[B]
   def mapR[B](f: A ⇒ Resolvable[B]): Resolution[B]
@@ -28,7 +31,8 @@ object Resolution {
     def reResolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = r.resolve(endpoints)
     def isResolved = false
   }
-  def exhaustList[A](pts: EndpointPool, xs: List[Resolution[A]])(implicit ec: ExecutionContext): Future[List[A]] = async {
+  /** Recursively resolve a list of resolutions */
+  def exhaustList[A](endpoints: EndpointPool, xs: List[Resolution[A]])(implicit ec: ExecutionContext): Future[List[A]] = async {
     if (xs.forall(_.isResolved)) {
       // everything is resolved, return
       xs flatMap { case Resolution.Result(r) ⇒ r :: Nil; case _ ⇒ Nil }
@@ -40,7 +44,7 @@ object Resolution {
       }.toSeq)
 
       // process the pool again
-      val points = await(man.process(pts))
+      val points = await(man.process(endpoints))
 
       // resolve the ones that were not resolved
       val next = await(Future.sequence(xs.map(_.reResolve(points))))
@@ -63,6 +67,7 @@ trait Resolvable[+A] {
   final def go(implicit ec: ExecutionContext): Future[A] = async {
     val points = await(manager.initial)
     val res = await(resolve(points))
+    // recursively pull and resolve all bottom layers
     await(Resolution.exhaustList(points, List(res))).head
   }
 
@@ -134,6 +139,7 @@ final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[L
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
     val points = await(manager.process(endpoints))
     val res = await(Future.sequence(in.map { x: Resolvable[A] ⇒ x.resolve(points) }))
+    // recursively pull and resolve all bottom layers
     Resolution.Result(await(Resolution.exhaustList(points, res.toList)))
   }
 }

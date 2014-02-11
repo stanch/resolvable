@@ -44,5 +44,5 @@ object EndpointPool {
   val empty = new EndpointPool(Set.empty)
 
   /** Merge several pools together */
-  def merge(pools: Seq[EndpointPool]) = pools.fold(EndpointPool.empty)(_ ++ _)
+  def merge(pools: Seq[EndpointPool]) = pools.fold(empty)(_ ++ _)
 }

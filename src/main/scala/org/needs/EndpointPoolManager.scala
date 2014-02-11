@@ -20,6 +20,7 @@ trait EndpointPoolManager {
   final def +(that: EndpointPoolManager): EndpointPoolManager =
     ComposedEndpointPoolManager(this, that)
 
+  /** Add pool initializer */
   final def addInitializer(initializer: Future[EndpointPool]): EndpointPoolManager =
     InitializedEndpointPoolManager(this, initializer)
 
