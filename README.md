@@ -118,8 +118,7 @@ trait Endpoints {
 Now let’s remember what we needed. A book, an author and an avatar. Here it goes:
 
 ```scala
-// baking Endpoints in
-trait Needs { self: Endpoints ⇒
+trait Needs { self: Endpoints with JsonFormats ⇒
   def book(id: String) = Source[Book].from(RemoteBook(id))
   def author(id: String) = Source[Author].from(RemoteAuthor(id))
   def avatar(url: String) = Source[File].from(LocalCachedfile(url)) orElse Source[File].from(RemoteFile(url))
