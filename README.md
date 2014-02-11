@@ -35,6 +35,7 @@ Food for thought:
 * If we fetch 10 books written by different authors, we expect the authors to be fetched with an aggregated request.
 * [json-api](http://jsonapi.org/) compound documents look nice!
 * **We want to optimize for all the above**. Still simple?
+* Don’t forget we are not going to modify the original data model in any way. Say no to annotations!
 
 ### Resolvable
 
@@ -69,6 +70,11 @@ which returns JSON, we’ll have an endpoint with `Data = JsValue` and `fetch` u
 client to download the respective url.
 
 ```scala
+import org.needs._
+import org.needs.http._
+import org.needs.json._
+import org.needs.file._
+
 trait Endpoints {
 
   // this logger just println-s the endpoints being fetched
@@ -118,6 +124,9 @@ trait Endpoints {
 Now let’s remember what we needed. A book, an author and an avatar. Here it goes:
 
 ```scala
+import org.needs.Source
+import play.api.data.mapping.json.Rules._
+
 trait Needs { self: Endpoints with JsonFormats ⇒
   def book(id: String) = Source[Book].from(RemoteBook(id))
   def author(id: String) = Source[Author].from(RemoteAuthor(id))
@@ -132,18 +141,19 @@ That was easy... but how does it know how to load `Book`s from `RemoteBook`, whi
 ```scala
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import play.api.data.mapping.From
 import play.api.data.mapping.json.Rules._
 
 // baking Needs in
 trait JsonFormats { self: Needs ⇒
 
+  // Rule[JsValue, Resolvable[Book]]
   implicit val bookRule = Resolvable.rule[JsValue, Book] { __ ⇒
     (__ \ "id").read[String] and
     (__ \ "title").read[String] and
     (__ \ "authorId").read[String].fmap(author) // here’s where the magic happens!
   }
   
+  // Rule[JsValue, Resolvable[Author]]
   implicit val authorRule = Resolvable.rule[JsValue, Author] { __ ⇒
     (__ \ "id").read[String] and
     (__ \ "name").read[String] and
