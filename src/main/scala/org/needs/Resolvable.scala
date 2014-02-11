@@ -9,19 +9,62 @@ import scala.reflect.macros.Context
 import play.api.libs.functional.{Functor, Applicative}
 import play.api.data.mapping.Rule
 
+sealed trait Resolution[+A] {
+  def map[B](f: A ⇒ B): Resolution[B]
+  def mapR[B](f: A ⇒ Resolvable[B]): Resolution[B]
+  def reResolve(endpoints: EndpointPool)(implicit ec: ExecutionContext): Future[Resolution[A]]
+  def isResolved: Boolean
+}
+object Resolution {
+  case class Result[A](r: A) extends Resolution[A] {
+    def map[B](f: A ⇒ B) = Result(f(r))
+    def mapR[B](f: A ⇒ Resolvable[B]) = Propagate(f(r))
+    def reResolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful(Result(r))
+    def isResolved = true
+  }
+  case class Propagate[A](r: Resolvable[A]) extends Resolution[A] {
+    def map[B](f: A ⇒ B) = Propagate(r.map(f))
+    def mapR[B](f: A ⇒ Resolvable[B]) = Propagate(r.flatMap(f))
+    def reResolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = r.resolve(endpoints)
+    def isResolved = false
+  }
+  def exhaustList[A](pts: EndpointPool, xs: List[Resolution[A]])(implicit ec: ExecutionContext): Future[List[A]] = async {
+    if (xs.forall(_.isResolved)) {
+      // everything is resolved, return
+      xs flatMap { case Resolution.Result(r) ⇒ r :: Nil; case _ ⇒ Nil }
+    } else {
+      // compose managers of all propagated resolvables
+      val man = EndpointPoolManager.compose(xs.flatMap {
+        case Resolution.Result(_) ⇒ Nil
+        case Resolution.Propagate(r) ⇒ r.manager :: Nil
+      }.toSeq)
+
+      // process the pool again
+      val points = await(man.process(pts))
+
+      // resolve the ones that were not resolved
+      val next = await(Future.sequence(xs.map(_.reResolve(points))))
+
+      // loop
+      await(exhaustList(points, next))
+    }
+  }
+}
+
 /** Resolvable is something that can be fetched using a pool of Endpoints */
 trait Resolvable[+A] {
-  /** Enables resolution by adding default endpoints */
-  val initiator: EndpointPoolInitiator
-
-  /** Optimizes resolution by adding aggregated endpoints */
-  val optimizer: EndpointPoolOptimizer
+  /** Manages the endpoint pool */
+  def manager: EndpointPoolManager
 
   /** Resolve using the specified endpoints */
-  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext): Future[A]
+  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext): Future[Resolution[A]]
 
   /** Resolve using the initial endpoints */
-  final def go(implicit ec: ExecutionContext) = initiator.initPool(ec).flatMap(resolve)
+  final def go(implicit ec: ExecutionContext): Future[A] = async {
+    val points = await(manager.initial)
+    val res = await(resolve(points))
+    await(Resolution.exhaustList(points, List(res))).head
+  }
 
   /** Map over a function f */
   final def map[B](f: A ⇒ B): Resolvable[B] = MappedResolvable(this, f)
@@ -34,24 +77,17 @@ trait Resolvable[+A] {
 }
 
 final case class MappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ B) extends Resolvable[B] {
-  val initiator = ma.initiator
-  val optimizer = ma.optimizer
-  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = ma.resolve(endpoints).map(f)
+  val manager = ma.manager
+  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = ma.resolve(endpoints).map(_.map(f))
 }
 
 final case class FlatMappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ Resolvable[B]) extends Resolvable[B] {
-  val initiator = ma.initiator
-  val optimizer = ma.optimizer
-  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
-    val mb = f(await(ma.resolve(endpoints)))
-    val points = await(mb.optimizer.addOptimal(endpoints ++ await(mb.initiator.initPool(ec)), ec))
-    await(mb.resolve(points))
-  }
+  val manager = ma.manager
+  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = ma.resolve(endpoints).map(_.mapR(f))
 }
 
 final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolvable[B]) extends Resolvable[B] {
-  val initiator = m1.initiator + m2.initiator
-  val optimizer = m1.optimizer andThen m2.optimizer
+  val manager = m1.manager + m2.manager
   // TODO: concatenate failures
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = m1.resolve(endpoints).recoverWith {
     case _ ⇒ m2.resolve(endpoints)
@@ -59,25 +95,28 @@ final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolva
 }
 
 final case class PureResolvable[A](a: A) extends Resolvable[A] {
-  val initiator = EndpointPoolInitiator.none
-  val optimizer = EndpointPoolOptimizer.none
-  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful(a)
+  val manager = EndpointPoolManager.none
+  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful(Resolution.Result(a))
 }
 
 final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable[A]) extends Resolvable[B] {
-  val initiator = mf.initiator + ma.initiator
-  val optimizer = mf.optimizer andThen ma.optimizer
+  val manager = mf.manager + ma.manager
 
   def tryFuture[X](f: Future[X])(implicit ec: ExecutionContext) =
     f.map(x ⇒ Success(x)).recover { case x ⇒ Failure(x) }
 
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
-    val s = await(optimizer.addOptimal(endpoints ++ await(initiator.initPool(ec)), ec))
-    val f = tryFuture(mf.resolve(s))
-    val a = tryFuture(ma.resolve(s))
+    val points = await(manager.process(endpoints))
+    val f = tryFuture(mf.resolve(points))
+    val a = tryFuture(ma.resolve(points))
     // TODO: concatenate errors
     (await(f), await(a)) match {
-      case (Success(x), Success(y)) ⇒ x(y)
+      case (Success(x), Success(y)) ⇒ (x, y) match {
+        case (Resolution.Propagate(mf1), Resolution.Propagate(ma1)) ⇒ Resolution.Propagate(AppliedResolvable(mf1, ma1))
+        case (Resolution.Propagate(mf1), Resolution.Result(a1)) ⇒ Resolution.Propagate(mf1.map(_(a1)))
+        case (Resolution.Result(f1), Resolution.Propagate(ma1)) ⇒ Resolution.Propagate(ma1.map(f1))
+        case (Resolution.Result(f1), Resolution.Result(a1)) ⇒ Resolution.Result(f1(a1))
+      }
       case (Failure(t), _) ⇒ throw t
       case (_, Failure(t)) ⇒ throw t
     }
@@ -85,26 +124,24 @@ final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable
 }
 
 final case class FutureResolvable[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) extends Resolvable[A] {
-  val initiator = EndpointPoolInitiator.future(implicit ec ⇒ in(ec).map(_.initiator))
-  val optimizer = EndpointPoolOptimizer.future(implicit ec ⇒ in(ec).map(_.optimizer))
+  val manager = EndpointPoolManager.future(implicit ec ⇒ in(ec).map(_.manager))
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = in(ec).flatMap(_.resolve(endpoints))
 }
 
 // TODO: use CanBuildFrom to generalize to traversables?
 final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[List[A]] {
-  val initiator = EndpointPoolInitiator.merge(in.map(_.initiator))
-  val optimizer = EndpointPoolOptimizer.chain(in.map(_.optimizer))
+  val manager = EndpointPoolManager.compose(in.map(_.manager))
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
-    val optimized = await(optimizer.addOptimal(endpoints ++ await(initiator.initPool(ec)), ec))
-    await(Future.sequence(in.map(_.resolve(optimized))))
+    val points = await(manager.process(endpoints))
+    val res = await(Future.sequence(in.map { x: Resolvable[A] ⇒ x.resolve(points) }))
+    Resolution.Result(await(Resolution.exhaustList(points, res.toList)))
   }
 }
 
 final case class OptionResolvable[A](in: Option[Resolvable[A]]) extends Resolvable[Option[A]] {
-  val initiator = in.map(_.initiator).getOrElse(EndpointPoolInitiator.none)
-  val optimizer = in.map(_.optimizer).getOrElse(EndpointPoolOptimizer.none)
+  val manager = in.map(_.manager).getOrElse(EndpointPoolManager.none)
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
-    in.map(_.resolve(endpoints).map(Some.apply)).getOrElse(Future.successful(None))
+    in.map(_.resolve(endpoints).map(_.map(Some.apply))).getOrElse(Future.successful(Resolution.Result(None)))
 }
 
 object EndpointDataResolvable {

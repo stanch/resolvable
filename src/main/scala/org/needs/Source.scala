@@ -1,16 +1,15 @@
 package org.needs
 
 import scala.language.implicitConversions
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Future, ExecutionContext}
 import play.api.data.mapping.Rule
 
 /** A [[Resolvable]] that selects matching endpoints from the pool and probes them one by one, respecting priority */
 final case class Source[A](initial: Endpoint*)(
   matching: Source.Matching[A],
-  priority: Source.Priority = PartialFunction.empty,
-  val optimizer: EndpointPoolOptimizer = EndpointPoolOptimizer.none) extends Resolvable[A] {
+  priority: Source.Priority = PartialFunction.empty) extends Resolvable[A] {
 
-  val initiator = EndpointPoolInitiator(EndpointPool(initial))
+  val manager = EndpointPoolManager(EndpointPool(initial))
 
   def seqOrder(p1: Seq[Int], p2: Seq[Int]) =
     (p1 zip p2).find { case (x, y) ⇒ x != y } match {
@@ -29,7 +28,7 @@ final case class Source[A](initial: Endpoint*)(
     }
 
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
-    select(endpoints).reduce(_ orElse _).resolve(endpoints)
+    Future.successful(Resolution.Propagate(select(endpoints).reduce(_ orElse _)))
 }
 
 object Source {

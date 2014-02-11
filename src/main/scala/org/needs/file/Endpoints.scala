@@ -3,10 +3,12 @@ package org.needs.file
 import org.needs.Endpoint
 import java.io.File
 import scala.concurrent.{Future, ExecutionContext}
-import org.needs.http.HttpEndpoint
+import org.needs.http.{HttpClient, HttpEndpoint}
 
 trait FileEndpoint extends Endpoint {
   type Data = File
+
+  /** Resolved file will be put here */
   def create: File
 }
 
@@ -17,7 +19,8 @@ trait LocalFileEndpoint extends FileEndpoint {
 }
 
 trait HttpFileEndpoint extends FileEndpoint with HttpEndpoint {
-  val url: String
-  val baseUrl: String
-  protected def fetch(implicit ec: ExecutionContext) = client.getFile(create, new File(baseUrl, url).getAbsolutePath)
+  implicit class JsonHttpClient(client: HttpClient) {
+    def getFile(url: String, query: Map[String, String] = Map.empty)(implicit ec: ExecutionContext) =
+      client.getFile(create, url, query)
+  }
 }

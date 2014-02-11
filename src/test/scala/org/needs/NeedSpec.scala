@@ -3,11 +3,13 @@ package org.needs
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import play.api.data.mapping.From
+import play.api.data.mapping.{Rule, From}
 import play.api.data.mapping.json.Rules._
 import org.scalatest.FlatSpec
 import org.needs.json.HttpJsonEndpoint
 import org.needs.http.{HttpClient, HttpEndpoint, DispatchClient}
+import java.io.File
+import org.needs.file.HttpFileEndpoint
 
 /* Data model */
 
@@ -22,12 +24,13 @@ import org.needs.http.{HttpClient, HttpEndpoint, DispatchClient}
 //  }
 //}
 
-case class Author(id: String, name: String)
+case class Author(id: String, name: String, picture: File)
 object Author {
   implicit val rule = From[JsValue] { __ ⇒
     Resolvable.rule[JsValue, Author] {
       (__ \ "id").read[String] and
-      (__ \ "name").read[String]
+      (__ \ "name").read[String] and
+      (__ \ "picture").read[String].fmap(Needs.picture)
     }
   }
 }
@@ -66,12 +69,17 @@ object Latest {
 
 /* Endpoints */
 
-trait Base extends HttpJsonEndpoint {
-  val logger = EndpointLogger.println()
+trait Base extends HttpEndpoint {
+  val logger = EndpointLogger.println(success = true, failure = false)
   val client = new DispatchClient
 }
 
-abstract class SingleResource(val baseUrl: String) extends Base {
+case class RemoteFile(url: String) extends Base with HttpFileEndpoint {
+  def create = File.createTempFile("fetched", ".bin")
+  protected def fetch(implicit ec: ExecutionContext) = client.getFile(url)
+}
+
+abstract class SingleResource(val baseUrl: String) extends Base with HttpJsonEndpoint {
   val id: String
   protected def fetch(implicit ec: ExecutionContext) = client.getJson(s"$baseUrl/$id")
 }
@@ -82,7 +90,7 @@ case class RemoteAuthor(id: String)
 case class RemoteStory(id: String)
   extends SingleResource("http://routestory.herokuapp.com/api/stories")
 
-case class RemoteLatest(count: Int) extends Base {
+case class RemoteLatest(count: Int) extends Base with HttpJsonEndpoint {
   def fetch(implicit ec: ExecutionContext) =
     client.getJson("http://routestory.herokuapp.com/api/stories/latest", Map("limit" → count.toString))
 }
@@ -91,6 +99,7 @@ case class RemoteLatest(count: Int) extends Base {
 
 object Needs {
   def author(id: String) = Source[Author].from(RemoteAuthor(id))
+  def picture(url: String) = Source[File].from(RemoteFile(url))
   def story(id: String) = Source[Story].from(RemoteStory(id))
   def latest(count: Int) = Source[Latest].from(RemoteLatest(count))
 }
@@ -102,8 +111,11 @@ class NeedsSpec extends FlatSpec {
     //NeedMedia("story-zwAsEW54BBCt6kTCvmoaNA/audio/2.aac").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").flatMap(_ ⇒ NeedLatest(5)).go onComplete println
-    Needs.latest(10).go onComplete println
-    //(Needs.author("author-7sKtNqyebaTECWmr5LAJC") and Needs.author("author-QgMggevaDcYNRE8Aov3rY")).tupled.go onComplete println
+    //Needs.latest(10).go onComplete println
+    (Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV") and Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).tupled.go onComplete println
+//    val rule = implicitly[Rule[JsValue, Resolvable[Author]]]
+//    val x = RemoteAuthor("author-bWTPRa8rCLgVAVSMNsb7QV").data.map(rule.validate).map(_.get)
+//    x foreach println
     //Needs.story("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
   }
 }
