@@ -138,21 +138,16 @@ import play.api.data.mapping.json.Rules._
 // baking Needs in
 trait JsonFormats { self: Needs ⇒
 
-  implicit val bookRule = From[JsValue] { __ ⇒
-    Resolvable.rule[Book] {
-      (__ \ "id").read[String] and
-      (__ \ "title").read[String] and
-      (__ \ "authorId").read[String].fmap(author) // here’s where the magic happens!
-    }
+  implicit val bookRule = Resolvable.rule[JsValue, Book] { __ ⇒
+    (__ \ "id").read[String] and
+    (__ \ "title").read[String] and
+    (__ \ "authorId").read[String].fmap(author) // here’s where the magic happens!
   }
   
-  // this will have type Reads[Resolvable[Author]]
-  implicit val authorRule = From[JsValue] { __ ⇒
-    Resolvable.rule[Author] {
-      (__ \ "id").read[String] and
-      (__ \ "name").read[String] and
-      (__ \ "avatar").read[String].map(avatar)
-    }
+  implicit val authorRule = Resolvable.rule[JsValue, Author] { __ ⇒
+    (__ \ "id").read[String] and
+    (__ \ "name").read[String] and
+    (__ \ "avatar").read[String].fmap(avatar)
   }
 }
 ```
