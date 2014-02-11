@@ -48,7 +48,7 @@ When you combine `Resolvable`s using combinators, they form a dependency tree, w
 in the most optimal way, going layer by layer (i.e. breadth-first):
 ```scala
 // if the books have the same author, it will be fetched only once
-Resolvable.jumpList(List(needBook("1"), needBook("2"))).go // Future[List[Book]]
+Resolvable.fromList(List(needBook("1"), needBook("2"))).go // Future[List[Book]]
 
 import play.api.libs.functional.syntax._
 // if, for example, the book’s author has id "1", it will be fetched only once
