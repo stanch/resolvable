@@ -54,7 +54,7 @@ case class Latest(totalRows: Int, stories: List[StoryPreview])
 object Latest {
   implicit val rule = Resolvable.rule[JsValue, Latest] { __ ⇒
     (__ \ "total_rows").read[Int] and
-    (__ \ "rows").read[List[Resolvable[StoryPreview]]].fmap(Resolvable.jumpList)
+    (__ \ "rows").read[List[Resolvable[StoryPreview]]].fmap(Resolvable.fromList)
   }
 }
 

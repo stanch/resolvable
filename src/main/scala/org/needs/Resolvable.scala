@@ -168,13 +168,13 @@ object Resolvable {
   implicit def pureRule[I, O](implicit rule: Rule[I, O]): Rule[I, Resolvable[O]] = rule.fmap(PureResolvable.apply)
 
   /** Jump over the Future monad */
-  def jumpFuture[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) = FutureResolvable(in)
+  def fromFuture[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) = FutureResolvable(in)
 
   /** Jump over a List */
-  def jumpList[A](in: List[Resolvable[A]]) = ListResolvable(in)
+  def fromList[A](in: List[Resolvable[A]]) = ListResolvable(in)
 
   /** Jump over an Option */
-  def jumpOption[A](in: Option[Resolvable[A]]) = OptionResolvable(in)
+  def fromOption[A](in: Option[Resolvable[A]]) = OptionResolvable(in)
 
   /** A Functor instance for Resolvable */
   implicit object functor extends Functor[Resolvable] {
