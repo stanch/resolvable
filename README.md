@@ -34,84 +34,88 @@ Food for thought:
 * [json-api](http://jsonapi.org/) compound documents look nice!
 * **We want to optimize for all the above**. Still simple? [Skip the rest and show me the code!](#the-code)
 
-We will now split our problem into dealing with [endpoints](#endpoints), [dependencies](#needs)
-and [(JSON) deserialization](#deserialization).
+### Resolvable
+
+That all really called for an abstraction in shiny armor. Well, here it is!
+`Resolvable[A]` is something that can be resolved given a pool of endpoints:
+```scala
+def needBook(id: String): Resolvable[Book] = ???
+val book: Future[Book] = needBook.go // `go` uses the default endpoints
+```
+When you combine `Resolvable`s using combinators, they form a dependency tree, which will fetch the endpoints
+in the most optimal way, going layer by layer (i.e. breadth-first):
+```scala
+// returns Future[List[Book]]
+// if the books have the same author, it will be fetched only once
+Resolvable.jumpList(List(needBook("1"), needBook("2"))).go
+
+import play.api.libs.functional.syntax._
+// returns Future[(Book, Author)]
+// if, for example, the book’s author has id "1", it will be fetched only once
+(needBook("1") and needAuthor("1")).tupled.go
+
+// map, flatMap, orElse also work!
+(needBook("1") orElse needBook("2")).go // Future[Book]
+needBook("1").map(_.author.name).go // Future[String]
+```
 
 ### Endpoints
 
-Endpoints are probably the simplest part of the equation. Let’s start by baking in some common conventions:
+To actually fetch some data, we will need to define our endpoints. That’s a piece of cake!
+(quite literally, we’ll use the cake pattern for our convenience). An endpoint is basically
+something with a `Data` type and `fetch` method, which returns `Future[Data]`. Endpoints
+correspond directly to the external APIs. If there’s a REST API `/webservice/api/books/#id`,
+which returns JSON, we’ll have an endpoint with `Data = JsValue` and `fetch` using an http
+client to download the respective url.
 
 ```scala
-abstract class SingleResource(val baseUrl: String)
-  extends rest.SingleResourceEndpoint
-  with http.DispatchJsonClient
-  
-abstract class MultipleResources(val baseUrl: String)
-  extends rest.MultipleResourceEndpoint
-  with http.DispatchJsonClient
+trait Endpoints {
 
-case class RemoteBook(id: String)
-  extends SingleResource("/webservice/api/books")
-
-case class RemoteAuthor(id: String)
-  extends SingleResource("/webservice/api/authors")
+  // this logger just println’s the endpoints being fetched
+  // great for debugging!
+  val endpointLogger = EndpointLogger.println(success = true, failure = false)
   
-case class RemoteAuthors(ids: Set[String])
-  extends MultipleResources("/webservice/api/authors")
+  // Dispatch and Android clients are provided
+  val httpClient = new DispatchClient
+
+  // the base of our http endpoints
+  trait RemoteBase extends HttpEndpoint {
+    val logger = endpointLogger
+    val client = httpClient
+  }
+  
+  // reducing boilerplate for RESTful endpoints
+  abstract class RemoteResource(val baseUrl: String) extends RemoteBase with HttpJsonEndpoint {
+    def id: String
+    protected def fetch(implicit ec: ExecutionContext) = client.getJson(s"$baseUrl/$id")
+  }
+  
+  // an endpoint for our books
+  case class RemoteBook(id: String) extends RemoteResource("/webservice/api/books")
+  
+  // an endpoint for our authors
+  case class RemoteAuthor(id: String) extends RemoteResource("/webservice/api/authors")
+  
+  // the base for out file endpoints quick and dirty!
+  abstract class FileBase(url: String) extends FileEndpoint {
+    val logger = endpointLogger
+    // where the file will be create upon download
+    def create = new File(s"$cacheDir/${sanitize(url)}") // define cacheDir and sanitize somewhere
+  }
+  
+  // this one just tries to load the file from disk where it was cached
+  case class LocalCachedFile(url: String) extends FileBase(url) with LocalFileEndpoint
+  
+  // this one downloads the file to exactly where it’s supposed to be cached
+  case class RemoteFile(url: String) extends FileBase(url) with HttpFileEndpoint {
+    protected def fetch(implicit ec: ExecutionContext) = client.getFile(url)
+  }
+}
 ```
-
-The local endpoints currently require some boilerplate. Here’s an example:
-
-```scala
-trait AvatarEndpoint extends file.FileEndpoint {
-  def create = ??? // create a temp file to hold the avatar
-  val url: String
-}
-
-case class CachedAvatar(url: String)
-  extends AvatarEndpoint
-  with file.LocalFileEndpoint {
-  
-  override val priority = Seq(1) // probe before RemoteAvatar
-}
-
-case class RemoteAvatar(url: String)
-  extends AvatarEndpoint
-  with file.HttpFileEndpoint
-  with http.DispatchFileClient {
-  
-  val baseUrl = "/webservice/files" // file will be loaded from /webservice/files/:url
-}
-```
-
-### A small detour: Fulfillable
-
-Let’s call `Fulfillable[A]` **something, that knows how and where to get an `A` (asynchronously)**.
-This implies that in our example `Fulfillable[Book]` will need a little help from some `Fulfillable[Author]`
-(which in its turn needs a `Fulfillable[File]`): you can’t get a `Book` without an `Author`!
 
 ### Needs
 
-A concrete example of a `Fulfillable` is a `Need`. The `Need[A]` describes how to get an `A` by sequentially probing
-a number of `Endpoint`s:
 
-```scala
-case class NeedBook(id: String) extends Need[Book] with rest.Probing[Book] {
-  // list endpoints
-  use(RemoteBook(id), LocalBook(id))
-  
-  // describe how to load from them
-  from {
-    // using REST sugar
-    singleResource[RemoteBook]
-  }
-  from {
-    // using pattern matching
-    // (we say that a book is downloadable from LocalBook with the same id)
-    case b @ LocalBook(`id`) ⇒ b.probe
-  }
-}
-```
 
 ### Deserialization
 
