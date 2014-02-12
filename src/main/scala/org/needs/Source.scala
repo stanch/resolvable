@@ -21,7 +21,6 @@ final case class Source[A](initial: Endpoint*)(
     pool.select(matching.lift).map {
       case (pt, f) ⇒ (pt, priority.lift(pt).getOrElse(Seq(0)), f)
     }.toVector.sortWith {
-      case ((pt1, _, _), (pt2, _, _)) if pt1.isFetched != pt2.isFetched ⇒ pt1.isFetched > pt2.isFetched
       case ((_, p1, _), (_, p2, _)) ⇒ Source.seqOrder(p1, p2)
     }.map {
       case (_, _, f) ⇒ f

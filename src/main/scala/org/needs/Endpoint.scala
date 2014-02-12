@@ -14,15 +14,13 @@ trait Endpoint {
   /** Endpoint logger. See [[EndpointLogger]] */
   protected val logger: EndpointLogger
 
-  /** Tells if the fetching process has started */
-  final def isFetched = _fetchingLock.synchronized(_fetched.isDefined)
-
   // all this could be a lazy val, if not for the ExecutionContext
   final private val _fetchingLock = new Object
   final private var _fetched: Option[Future[Data]] = None
 
   /** Fetched data */
   final def data(implicit ec: ExecutionContext) = _fetchingLock.synchronized {
+    //println(this, _fetched)
     if (_fetched.isEmpty) {
       logger.logStart(this)
       val f = fetch

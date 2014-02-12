@@ -82,17 +82,17 @@ trait Resolvable[+A] {
   final def orElse[B >: A](alternative: Resolvable[B]): Resolvable[B] = AlternativeResolvable(this, alternative)
 }
 
-final case class MappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ B) extends Resolvable[B] {
+private[needs] final case class MappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ B) extends Resolvable[B] {
   val manager = ma.manager
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = ma.resolve(endpoints).map(_.map(f))
 }
 
-final case class FlatMappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ Resolvable[B]) extends Resolvable[B] {
+private[needs] final case class FlatMappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ Resolvable[B]) extends Resolvable[B] {
   val manager = ma.manager
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = ma.resolve(endpoints).map(_.mapR(f))
 }
 
-final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolvable[B]) extends Resolvable[B] {
+private[needs] final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolvable[B]) extends Resolvable[B] {
   val manager = m1.manager + m2.manager
   // TODO: concatenate failures
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = m1.resolve(endpoints).recoverWith {
@@ -103,12 +103,12 @@ final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolva
   }
 }
 
-final case class PureResolvable[A](a: A) extends Resolvable[A] {
+private[needs] final case class PureResolvable[A](a: A) extends Resolvable[A] {
   val manager = EndpointPoolManager.none
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful(Resolution.Result(a))
 }
 
-final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable[A]) extends Resolvable[B] {
+private[needs] final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable[A]) extends Resolvable[B] {
   val manager = mf.manager + ma.manager
 
   def tryFuture[X](f: Future[X])(implicit ec: ExecutionContext) =
@@ -132,7 +132,7 @@ final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable
   }
 }
 
-final case class FutureResolvable[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) extends Resolvable[A] {
+private[needs] final case class FutureResolvable[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) extends Resolvable[A] {
   val manager = EndpointPoolManager.future(implicit ec ⇒ in(ec).map(_.manager).recover {
     case NonFatal(_) ⇒ EndpointPoolManager.none
   })
@@ -140,7 +140,7 @@ final case class FutureResolvable[A](in: ExecutionContext ⇒ Future[Resolvable[
 }
 
 // TODO: use CanBuildFrom to generalize to traversables?
-final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[List[A]] {
+private[needs] final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[List[A]] {
   val manager = EndpointPoolManager.compose(in.map(_.manager))
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
     val points = await(manager.process(endpoints))
@@ -150,13 +150,13 @@ final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[L
   }
 }
 
-final case class OptionResolvable[A](in: Option[Resolvable[A]]) extends Resolvable[Option[A]] {
+private[needs] final case class OptionResolvable[A](in: Option[Resolvable[A]]) extends Resolvable[Option[A]] {
   val manager = in.map(_.manager).getOrElse(EndpointPoolManager.none)
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
     in.map(_.resolve(endpoints).map(_.map(Some.apply))).getOrElse(Future.successful(Resolution.Result(None)))
 }
 
-final case class DelayedResolvable[A](in: Resolvable[A]) extends Resolvable[Future[A]] {
+private[needs] final case class DelayedResolvable[A](in: Resolvable[A]) extends Resolvable[Future[A]] {
   val manager = in.manager
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful {
     Resolution.Result(async {

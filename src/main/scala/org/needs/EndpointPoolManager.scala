@@ -33,22 +33,22 @@ trait EndpointPoolManager {
   }
 }
 
-final case class ComposedEndpointPoolManager(m1: EndpointPoolManager, m2: EndpointPoolManager) extends EndpointPoolManager {
+private[needs] final case class ComposedEndpointPoolManager(m1: EndpointPoolManager, m2: EndpointPoolManager) extends EndpointPoolManager {
   def initial(implicit ec: ExecutionContext) = m1.initial ++ m2.initial
   def optimal(implicit ec: ExecutionContext) = pool ⇒ m1.optimal.apply(pool) ++ m2.optimal.apply(pool)
 }
 
-final case class InitializedEndpointPoolManager(m: EndpointPoolManager, i: Future[EndpointPool]) extends EndpointPoolManager {
+private[needs] final case class InitializedEndpointPoolManager(m: EndpointPoolManager, i: Future[EndpointPool]) extends EndpointPoolManager {
   def initial(implicit ec: ExecutionContext) = m.initial ++ i
   def optimal(implicit ec: ExecutionContext) = m.optimal
 }
 
-final case class OptimizedEndpointPoolManager(m: EndpointPoolManager, o: (ExecutionContext, EndpointPool) ⇒ Future[EndpointPool]) extends EndpointPoolManager {
+private[needs] final case class OptimizedEndpointPoolManager(m: EndpointPoolManager, o: (ExecutionContext, EndpointPool) ⇒ Future[EndpointPool]) extends EndpointPoolManager {
   def initial(implicit ec: ExecutionContext) = m.initial
   def optimal(implicit ec: ExecutionContext) = pool ⇒ m.optimal.apply(pool) ++ o.apply(ec, pool)
 }
 
-final case class FutureEndpointPoolManager(f: ExecutionContext ⇒ Future[EndpointPoolManager]) extends EndpointPoolManager {
+private[needs] final case class FutureEndpointPoolManager(f: ExecutionContext ⇒ Future[EndpointPoolManager]) extends EndpointPoolManager {
   def initial(implicit ec: ExecutionContext) = f(ec).flatMap(_.initial)
   def optimal(implicit ec: ExecutionContext) = pool ⇒ f(ec).flatMap(_.optimal.apply(pool))
 }

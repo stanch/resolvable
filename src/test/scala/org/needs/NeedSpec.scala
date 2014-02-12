@@ -12,23 +12,12 @@ import org.needs.file.HttpFileEndpoint
 
 /* Data model */
 
-//object Optimizer {
-//  val o = { endpoints: EndpointPool ⇒
-//    val add = endpoints.fold(Set.empty[String]) {
-//      case (ids, RemoteAuthor(id)) ⇒ ids + id
-//      case (ids, RemoteAuthors(i)) ⇒ ids ++ i
-//      case (ids, _) ⇒ ids
-//    }
-//    if (add.size > 1) endpoints + RemoteAuthors(add) else endpoints
-//  }
-//}
-
-case class Author(id: String, name: String, picture: File)
+case class Author(id: String, name: String, picture: Future[File])
 object Author {
   implicit val rule = Resolvable.rule[JsValue, Author] { __ ⇒
     (__ \ "id").read[String] and
     (__ \ "name").read[String] and
-    (__ \ "picture").read[String].fmap(Needs.picture)
+    (__ \ "picture").read[String].fmap(Needs.picture).fmap(Resolvable.delay)
   }
 }
 
@@ -102,8 +91,8 @@ class NeedsSpec extends FlatSpec {
     //NeedMedia("story-zwAsEW54BBCt6kTCvmoaNA/audio/2.aac").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").flatMap(_ ⇒ NeedLatest(5)).go onComplete println
-    //Needs.latest(10).go onComplete println
-    (Needs.author("abc") orElse Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).go onComplete println
+    Needs.latest(20).go onComplete println
+    //(Needs.author("abc") orElse Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).go onComplete println
     //(Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV") and Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).tupled.go onComplete println
 //    val rule = implicitly[Rule[JsValue, Resolvable[Author]]]
 //    val x = RemoteAuthor("author-bWTPRa8rCLgVAVSMNsb7QV").data.map(rule.validate).map(_.get)
