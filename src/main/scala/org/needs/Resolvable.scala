@@ -8,6 +8,7 @@ import scala.util.{Failure, Success}
 import scala.reflect.macros.Context
 import play.api.libs.functional.{Functor, Applicative}
 import play.api.data.mapping.{Reader, Rule}
+import scala.util.control.NonFatal
 
 /** A Resolution is either a pure value, or a `Resolvable` value,
   * which is propagated from the next layer of dependencies.
@@ -95,7 +96,10 @@ final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolva
   val manager = m1.manager + m2.manager
   // TODO: concatenate failures
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = m1.resolve(endpoints).recoverWith {
-    case _ ⇒ m2.resolve(endpoints)
+    case NonFatal(_) ⇒ m2.resolve(endpoints)
+  } map {
+    case r @ Resolution.Result(_) ⇒ r
+    case Resolution.Propagate(r) ⇒ Resolution.Propagate(AlternativeResolvable(r, m2))
   }
 }
 
@@ -108,7 +112,7 @@ final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable
   val manager = mf.manager + ma.manager
 
   def tryFuture[X](f: Future[X])(implicit ec: ExecutionContext) =
-    f.map(x ⇒ Success(x)).recover { case x ⇒ Failure(x) }
+    f.map(x ⇒ Success(x)).recover { case NonFatal(x) ⇒ Failure(x) }
 
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
     val points = await(manager.process(endpoints))
@@ -129,7 +133,9 @@ final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable
 }
 
 final case class FutureResolvable[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) extends Resolvable[A] {
-  val manager = EndpointPoolManager.future(implicit ec ⇒ in(ec).map(_.manager))
+  val manager = EndpointPoolManager.future(implicit ec ⇒ in(ec).map(_.manager).recover {
+    case NonFatal(_) ⇒ EndpointPoolManager.none
+  })
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = in(ec).flatMap(_.resolve(endpoints))
 }
 

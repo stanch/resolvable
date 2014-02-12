@@ -102,7 +102,8 @@ class NeedsSpec extends FlatSpec {
     //NeedMedia("story-zwAsEW54BBCt6kTCvmoaNA/audio/2.aac").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").go onComplete println
     //NeedStory("story-DLMwDHAyDknJxvidn4G6pA").flatMap(_ ⇒ NeedLatest(5)).go onComplete println
-    Needs.latest(10).go onComplete println
+    //Needs.latest(10).go onComplete println
+    (Needs.author("abc") orElse Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).go onComplete println
     //(Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV") and Needs.author("author-bWTPRa8rCLgVAVSMNsb7QV")).tupled.go onComplete println
 //    val rule = implicitly[Rule[JsValue, Resolvable[Author]]]
 //    val x = RemoteAuthor("author-bWTPRa8rCLgVAVSMNsb7QV").data.map(rule.validate).map(_.get)
