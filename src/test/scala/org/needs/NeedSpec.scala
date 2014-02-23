@@ -9,6 +9,7 @@ import org.needs.json.HttpJsonEndpoint
 import org.needs.http.{HttpClient, HttpEndpoint, DispatchClient}
 import java.io.File
 import org.needs.file.HttpFileEndpoint
+import java.util.concurrent.Executors
 
 /* Data model */
 
@@ -17,7 +18,7 @@ object Author {
   implicit val rule = Resolvable.rule[JsValue, Author] { __ ⇒
     (__ \ "id").read[String] and
     (__ \ "name").read[String] and
-    (__ \ "picture").read[String].fmap(Needs.picture).fmap(Resolvable.delay)
+    (__ \ "picture").read[String].fmap(Needs.picture).fmap(Resolvable.defer)
   }
 }
 
@@ -54,9 +55,15 @@ trait Base extends HttpEndpoint {
   val client = new DispatchClient
 }
 
+object FileDownloadContext {
+  lazy val ec = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(2))
+}
+
 case class RemoteFile(url: String) extends Base with HttpFileEndpoint {
   def create = File.createTempFile("fetched", ".bin")
-  protected def fetch(implicit ec: ExecutionContext) = client.getFile(url)
+  protected def fetch(implicit ec: ExecutionContext) = {
+    client.getFile(url)(FileDownloadContext.ec).map { x ⇒ Thread.sleep(3000); x }(FileDownloadContext.ec)
+  }
 }
 
 abstract class SingleResource(val baseUrl: String) extends Base with HttpJsonEndpoint {

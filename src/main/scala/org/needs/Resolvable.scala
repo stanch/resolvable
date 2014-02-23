@@ -156,7 +156,7 @@ private[needs] final case class OptionResolvable[A](in: Option[Resolvable[A]]) e
     in.map(_.resolve(endpoints).map(_.map(Some.apply))).getOrElse(Future.successful(Resolution.Result(None)))
 }
 
-private[needs] final case class DelayedResolvable[A](in: Resolvable[A]) extends Resolvable[Future[A]] {
+private[needs] final case class DeferredResolvable[A](in: Resolvable[A]) extends Resolvable[Future[A]] {
   val manager = in.manager
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful {
     Resolution.Result(async {
@@ -193,10 +193,13 @@ object Resolvable {
   /** Jump over an Option */
   def fromOption[A](in: Option[Resolvable[A]]): Resolvable[Option[A]] = OptionResolvable(in)
 
-  /** Delay a resolvable to get its result immediately as a `Future[Future[A]]` instead of `Future[A]`.
-    * Note that delayed resolvables *do not* cooperate with their siblings
+  /** Defer a resolvable to get its result immediately as a `Future[Future[A]]` instead of `Future[A]`.
+    * Note that subtrees of deferred siblings *do not* cooperate between each other.
     */
-  def delay[A](in: Resolvable[A]): Resolvable[Future[A]] = DelayedResolvable(in)
+  def defer[A](in: Resolvable[A]): Resolvable[Future[A]] = DeferredResolvable(in)
+
+  /** Create a Resolvable from a pure value */
+  def resolved[A](in: A): Resolvable[A] = PureResolvable(in)
 
   /** A Functor instance for Resolvable */
   implicit object functor extends Functor[Resolvable] {

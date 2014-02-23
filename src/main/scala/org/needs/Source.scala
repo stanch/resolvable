@@ -7,9 +7,10 @@ import play.api.data.mapping.Rule
 /** A [[Resolvable]] that selects matching endpoints from the pool and probes them one by one, respecting priority */
 final case class Source[A](initial: Endpoint*)(
   matching: Source.Matching[A],
-  priority: Source.Priority = PartialFunction.empty) extends Resolvable[A] {
+  priority: Source.Priority = PartialFunction.empty,
+  optimal: Source.Optimizer = (_, _) ⇒ Future.successful(EndpointPool.empty)) extends Resolvable[A] {
 
-  val manager = EndpointPoolManager(EndpointPool(initial))
+  val manager: EndpointPoolManager = EndpointPoolManager(EndpointPool(initial)).addOptimizer(optimal)
 
   def seqOrder(p1: Seq[Int], p2: Seq[Int]) =
     (p1 zip p2).find { case (x, y) ⇒ x != y } match {
@@ -19,11 +20,11 @@ final case class Source[A](initial: Endpoint*)(
 
   private def select(pool: EndpointPool) =
     pool.select(matching.lift).map {
-      case (pt, f) ⇒ (pt, priority.lift(pt).getOrElse(Seq(0)), f)
+      case (pt, f) ⇒ (priority.applyOrElse(pt, _ ⇒ Seq(0)), f)
     }.toVector.sortWith {
-      case ((_, p1, _), (_, p2, _)) ⇒ Source.seqOrder(p1, p2)
+      case ((p1, _), (p2, _)) ⇒ Source.seqOrder(p1, p2)
     }.map {
-      case (_, _, f) ⇒ f
+      case (_, f) ⇒ f
     }
 
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
@@ -41,6 +42,8 @@ object Source {
     * Default priority is Seq(0).
     */
   type Priority = PartialFunction[Endpoint, Seq[Int]]
+
+  type Optimizer = (ExecutionContext, EndpointPool) ⇒ Future[EndpointPool]
 
   def seqOrder(p1: Seq[Int], p2: Seq[Int]) =
     (p1 zip p2).find { case (x, y) ⇒ x != y } match {
