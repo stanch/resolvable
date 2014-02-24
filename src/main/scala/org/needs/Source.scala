@@ -20,7 +20,7 @@ final case class Source[A](initial: Endpoint*)(
 
   private def select(pool: EndpointPool) =
     pool.select(matching.lift).map {
-      case (pt, f) ⇒ (priority.applyOrElse(pt, _ ⇒ Seq(0)), f)
+      case (pt, f) ⇒ (priority.lift(pt).getOrElse(Seq(0)), f)
     }.toVector.sortWith {
       case ((p1, _), (p2, _)) ⇒ Source.seqOrder(p1, p2)
     }.map {
@@ -59,12 +59,12 @@ class SourceBuilder[A] {
   /** A source fetched from `endpoint.data` */
   def from[E <: Endpoint](endpoint: E)(implicit rule: Rule[E#Data, Resolvable[A]]): Resolvable[A] =
     Source(endpoint) {
-      case pt @ `endpoint` ⇒ EndpointDataResolvable[A, E](pt)
+      case pt @ `endpoint` ⇒ Resolvable[A].fromEndpoint(pt)
     }
 
   /** A source fetched from `endpoint.data`, mapped onto `path` */
   def fromPath[E <: Endpoint, D](endpoint: E)(path: E#Data ⇒ D)(implicit rule: Rule[D, Resolvable[A]]): Resolvable[A] =
     Source(endpoint) {
-      case pt @ `endpoint` ⇒ EndpointDataResolvable[A, E, D](pt)(path)
+      case pt @ `endpoint` ⇒ Resolvable[A].fromEndpointPath(pt)(path)
     }
 }

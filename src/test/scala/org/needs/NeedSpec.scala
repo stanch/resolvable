@@ -71,8 +71,16 @@ abstract class SingleResource(val baseUrl: String) extends Base with HttpJsonEnd
   protected def fetch(implicit ec: ExecutionContext) = client.getJson(s"$baseUrl/$id")
 }
 
+abstract class MultipleResources(val baseUrl: String) extends Base with HttpJsonEndpoint {
+  val ids: Set[String]
+  protected def fetch(implicit ec: ExecutionContext) = client.getJson(s"$baseUrl/${ids.mkString(",")}")
+}
+
 case class RemoteAuthor(id: String)
   extends SingleResource("http://routestory.herokuapp.com/api/authors")
+
+case class RemoteAuthors(ids: Set[String])
+  extends MultipleResources("http://routestory.herokuapp.com/api/authors")
 
 case class RemoteStory(id: String)
   extends SingleResource("http://routestory.herokuapp.com/api/stories")
@@ -85,7 +93,24 @@ case class RemoteLatest(count: Int) extends Base with HttpJsonEndpoint {
 /* Needs */
 
 object Needs {
-  def author(id: String) = Source[Author].from(RemoteAuthor(id))
+  def author(id: String) =
+    Source[Author](RemoteAuthor(id))({
+      case e @ RemoteAuthor(`id`) ⇒
+        Resolvable[Author].fromEndpoint(e)
+      case e @ RemoteAuthors(ids) if ids.contains(id) ⇒
+        Resolvable[Author].fromEndpointPath(e)(_.as[List[JsValue]].find(_ \ "_id" == JsString(id)).get)
+    }, {
+      case RemoteAuthors(uuids) ⇒ Seq(1, uuids.size)
+    }, { (ec, pool) ⇒
+      Future.successful(pool.fold(Set.empty[String]) {
+        case (ids, RemoteAuthor(i)) ⇒ ids + i
+        case (ids, _) ⇒ ids
+      } match {
+        case x if x.size > 1 ⇒ EndpointPool(RemoteAuthors(x))
+        case _ ⇒ EndpointPool.empty
+      })
+    })
+
   def picture(url: String) = Source[File].from(RemoteFile(url))
   def story(id: String) = Source[Story].from(RemoteStory(id))
   def latest(count: Int) = Source[Latest].from(RemoteLatest(count))

@@ -12,8 +12,8 @@ trait EndpointPoolManager {
 
   /** Process the pool by adding the initial endpoints and then optimizing it */
   final def process(pool: EndpointPool)(implicit ec: ExecutionContext) = async {
-    val i = pool ++ await(initial)
-    i ++ await(optimal.apply(i))
+    val i = await(initial)
+    pool ++ i ++ await(optimal.apply(i))
   }
 
   /** Compose with another manager */

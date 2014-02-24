@@ -93,13 +93,20 @@ private[needs] final case class FlatMappedResolvable[A, B](ma: Resolvable[A], f:
 }
 
 private[needs] final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolvable[B]) extends Resolvable[B] {
-  val manager = m1.manager + m2.manager
+  val manager = m1.manager
   // TODO: concatenate failures
-  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = m1.resolve(endpoints).recoverWith {
-    case NonFatal(_) ⇒ m2.resolve(endpoints)
+  def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = m1.resolve(endpoints) map {
+    // zip with `true` to signify that we are using m1
+    (true, _)
+  } recover {
+    // zip with `false` to signify that we are using m2
+    case NonFatal(_) ⇒ (false, Resolution.Propagate(m2))
   } map {
-    case r @ Resolution.Result(_) ⇒ r
-    case Resolution.Propagate(r) ⇒ Resolution.Propagate(AlternativeResolvable(r, m2))
+    // pass through (m1 has worked out, or we are already in m2)
+    case (_, r @ Resolution.Result(_)) ⇒ r
+    case (false, r @ Resolution.Propagate(_)) ⇒ r
+    // propagate, retaining the m2 alternative
+    case (true, Resolution.Propagate(r)) ⇒ Resolution.Propagate(AlternativeResolvable(r, m2))
   }
 }
 
@@ -167,14 +174,6 @@ private[needs] final case class DeferredResolvable[A](in: Resolvable[A]) extends
   }
 }
 
-object EndpointDataResolvable {
-  def apply[A, E <: Endpoint](in: E)(implicit rule: Rule[E#Data, Resolvable[A]]): Resolvable[A] =
-    FutureResolvable { implicit ec ⇒ in.data.map(rule.validate).map(_.get) }
-
-  def apply[A, E <: Endpoint, D](in: E)(path: E#Data ⇒ D)(implicit rule: Rule[D, Resolvable[A]]): Resolvable[A] =
-    FutureResolvable { implicit ec ⇒ in.data.map(path).map(rule.validate).map(_.get) }
-}
-
 object Resolvable {
   import ResolvableMacros._
 
@@ -201,6 +200,9 @@ object Resolvable {
   /** Create a Resolvable from a pure value */
   def resolved[A](in: A): Resolvable[A] = PureResolvable(in)
 
+  /** Construct a builder to get a Resolvable from a particular Endpoint */
+  def apply[A] = new EndpointResolvableBuilder[A]
+
   /** A Functor instance for Resolvable */
   implicit object functor extends Functor[Resolvable] {
     def fmap[A, B](m: Resolvable[A], f: A ⇒ B): Resolvable[B] = MappedResolvable(m, f)
@@ -212,6 +214,16 @@ object Resolvable {
     def map[A, B](m: Resolvable[A], f: A ⇒ B): Resolvable[B] = MappedResolvable(m, f)
     def apply[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable[A]): Resolvable[B] = AppliedResolvable(mf, ma)
   }
+}
+
+class EndpointResolvableBuilder[A] {
+  /** Create a Resolvable from a particular Endpoint */
+  def fromEndpoint[E <: Endpoint](endpoint: E)(implicit rule: Rule[E#Data, Resolvable[A]]) =
+    FutureResolvable { implicit ec ⇒ endpoint.data.map(rule.validate).map(_.get) }
+
+  /** Create a Resolvable from a particular Endpoint */
+  def fromEndpointPath[E <: Endpoint, D](endpoint: E)(path: E#Data ⇒ D)(implicit rule: Rule[D, Resolvable[A]]) =
+    FutureResolvable { implicit ec ⇒ endpoint.data.map(path).map(rule.validate).map(_.get) }
 }
 
 object ResolvableMacros {
