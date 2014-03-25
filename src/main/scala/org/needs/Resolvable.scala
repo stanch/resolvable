@@ -7,8 +7,11 @@ import scala.async.Async._
 import scala.util.{Failure, Success}
 import scala.reflect.macros.Context
 import play.api.libs.functional.{Functor, Applicative}
-import play.api.data.mapping.{Reader, Rule}
+import play.api.data.mapping._
 import scala.util.control.NonFatal
+import scala.util.Failure
+import play.api.data.mapping.Reader
+import scala.util.Success
 
 /** A Resolution is either a pure value, or a `Resolvable` value,
   * which is propagated from the next layer of dependencies.
@@ -217,13 +220,19 @@ object Resolvable {
 }
 
 class EndpointResolvableBuilder[A] {
+  case class ValidationErrors(paths: Seq[(Path, Seq[ValidationError])]) extends Exception(paths.toString())
+
+  private def throwValidationErrors[X, Y](va: VA[X, Y]) = va recoverTotal {
+    case play.api.data.mapping.Failure(paths) ⇒ throw ValidationErrors(paths)
+  }
+
   /** Create a Resolvable from a particular Endpoint */
   def fromEndpoint[E <: Endpoint](endpoint: E)(implicit rule: Rule[E#Data, Resolvable[A]]) =
-    FutureResolvable { implicit ec ⇒ endpoint.data.map(rule.validate).map(_.get) }
+    FutureResolvable { implicit ec ⇒ endpoint.data.map(rule.validate).map(throwValidationErrors) }
 
   /** Create a Resolvable from a particular Endpoint */
   def fromEndpointPath[E <: Endpoint, D](endpoint: E)(path: E#Data ⇒ D)(implicit rule: Rule[D, Resolvable[A]]) =
-    FutureResolvable { implicit ec ⇒ endpoint.data.map(path).map(rule.validate).map(_.get) }
+    FutureResolvable { implicit ec ⇒ endpoint.data.map(path).map(rule.validate).map(throwValidationErrors) }
 }
 
 object ResolvableMacros {
