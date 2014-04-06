@@ -2,7 +2,7 @@ name := "needs"
 
 organization := "org.needs"
 
-version := "2.0.0-M2"
+version := "2.0.0-M3"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
@@ -13,20 +13,21 @@ autoCompilerPlugins := true
 scalacOptions += "-feature"
 
 resolvers ++= Seq(
-  "Stanch@bintray" at "http://dl.bintray.com/stanch/maven",
-  Resolver.file("local-play", file("c:/projects/Play20/repository/local"))(Resolver.ivyStylePatterns)
+  "Stanch@bintray" at "http://dl.bintray.com/stanch/maven"
 )
 
 libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-  compilerPlugin("org.scalamacros" % "paradise" % "2.0.0-M1" cross CrossVersion.full)
+  "org.scalamacros" %% "quasiquotes" % "2.0.0-M7",
+  compilerPlugin("org.scalamacros" % "paradise" % "2.0.0-M7" cross CrossVersion.full)
 )
 
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-json" % "2.3-SNAPSHOT",
+  "jto.github.io" %% "validation-core" % "1.0-SNAPSHOT",
+  "jto.github.io" %% "validation-json" % "1.0-SNAPSHOT",
   "org.needs" %% "play-functional-extras" % "1.0.0",
-  "org.scala-lang.modules" %% "scala-async" % "0.9.0-M4",
-  "org.scalatest" %% "scalatest" % "2.0" % "test"
+  "org.scala-lang.modules" %% "scala-async" % "0.9.1",
+  "org.scalatest" %% "scalatest" % "2.1.2" % "test"
 )
 
 // http clients

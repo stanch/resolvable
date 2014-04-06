@@ -220,9 +220,7 @@ object Resolvable {
 }
 
 class EndpointResolvableBuilder[A] {
-  case class ValidationErrors(paths: Seq[(Path, Seq[ValidationError])]) extends Exception(paths.toString())
-
-  private def throwValidationErrors[X, Y](va: VA[X, Y]) = va recoverTotal {
+  private def throwValidationErrors[O](va: VA[O]) = va recoverTotal {
     case play.api.data.mapping.Failure(paths) ⇒ throw ValidationErrors(paths)
   }
 
