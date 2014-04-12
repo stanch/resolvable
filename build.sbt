@@ -14,7 +14,8 @@ scalacOptions += "-feature"
 
 resolvers ++= Seq(
   "Stanch@bintray" at "http://dl.bintray.com/stanch/maven",
-  "JTO snapshots" at "https://raw.github.com/jto/mvn-repo/master/snapshots"
+  "JTO snapshots" at "https://raw.github.com/jto/mvn-repo/master/snapshots",
+  "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases/"
 )
 
 libraryDependencies ++= Seq(
@@ -26,7 +27,7 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= Seq(
   "jto.github.io" %% "validation-core" % "1.0-SNAPSHOT",
   "jto.github.io" %% "validation-json" % "1.0-SNAPSHOT",
-  "com.typesafe.play" %% "play-json" % "2.2.0",
+  "com.typesafe.play" %% "play-json" % "2.2.2",
   "org.needs" %% "play-functional-extras" % "1.0.0",
   "org.scala-lang.modules" %% "scala-async" % "0.9.1",
   "org.scalatest" %% "scalatest" % "2.1.2" % "test"
