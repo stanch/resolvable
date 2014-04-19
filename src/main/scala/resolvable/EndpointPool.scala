@@ -1,4 +1,4 @@
-package org.needs
+package resolvable
 
 /** A pool of endpoints */
 final class EndpointPool(protected val endpoints: Set[Endpoint]) {

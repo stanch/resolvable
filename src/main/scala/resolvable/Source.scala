@@ -1,4 +1,4 @@
-package org.needs
+package resolvable
 
 import scala.language.implicitConversions
 import scala.concurrent.{Future, ExecutionContext}

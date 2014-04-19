@@ -1,9 +1,9 @@
-package org.needs.file
+package resolvable.file
 
-import org.needs.Endpoint
 import java.io.File
 import scala.concurrent.{Future, ExecutionContext}
-import org.needs.http.{HttpClient, HttpEndpoint}
+import resolvable.http.{HttpClient, HttpEndpoint}
+import resolvable.Endpoint
 
 trait FileEndpoint extends Endpoint {
   type Data = File

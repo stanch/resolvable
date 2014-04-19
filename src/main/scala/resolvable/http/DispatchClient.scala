@@ -1,10 +1,10 @@
-package org.needs.http
+package resolvable.http
 
 import dispatch._
 import play.api.libs.json.Json
 import scala.concurrent.ExecutionContext
-import org.needs.json.JsonEndpoint
-import org.needs.file.FileEndpoint
+import resolvable.json.JsonEndpoint
+import resolvable.file.FileEndpoint
 import java.io.File
 
 class DispatchClient extends HttpClient {

@@ -1,11 +1,11 @@
-package org.needs.http
+package resolvable.http
 
 import com.loopj.android.http.{RequestParams, FileAsyncHttpResponseHandler, AsyncHttpClient, AsyncHttpResponseHandler}
 import play.api.libs.json.{Json, JsValue}
 import scala.concurrent.{Future, ExecutionContext, Promise}
 import scala.util.{Success, Failure, Try}
-import org.needs.json.JsonEndpoint
-import org.needs.file.FileEndpoint
+import resolvable.json.JsonEndpoint
+import resolvable.file.FileEndpoint
 import java.io.File
 import scala.collection.JavaConverters._
 

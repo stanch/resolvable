@@ -1,8 +1,8 @@
-package org.needs.json
+package resolvable.json
 
-import org.needs._
+import resolvable._
 import play.api.libs.json._
-import org.needs.http.{HttpClient, HttpEndpoint}
+import resolvable.http.{HttpClient, HttpEndpoint}
 import scala.concurrent.ExecutionContext
 
 trait JsonEndpoint extends Endpoint {

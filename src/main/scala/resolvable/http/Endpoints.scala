@@ -1,6 +1,6 @@
-package org.needs.http
+package resolvable.http
 
-import org.needs.Endpoint
+import resolvable.Endpoint
 import scala.concurrent.{Future, ExecutionContext}
 import java.io.File
 

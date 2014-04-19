@@ -1,4 +1,4 @@
-package org.needs
+package resolvable
 
 import scala.language.experimental.macros
 import scala.language.higherKinds
@@ -85,17 +85,17 @@ trait Resolvable[+A] {
   final def orElse[B >: A](alternative: Resolvable[B]): Resolvable[B] = AlternativeResolvable(this, alternative)
 }
 
-private[needs] final case class MappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ B) extends Resolvable[B] {
+private[resolvable] final case class MappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ B) extends Resolvable[B] {
   val manager = ma.manager
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = ma.resolve(endpoints).map(_.map(f))
 }
 
-private[needs] final case class FlatMappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ Resolvable[B]) extends Resolvable[B] {
+private[resolvable] final case class FlatMappedResolvable[A, B](ma: Resolvable[A], f: A ⇒ Resolvable[B]) extends Resolvable[B] {
   val manager = ma.manager
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = ma.resolve(endpoints).map(_.mapR(f))
 }
 
-private[needs] final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolvable[B]) extends Resolvable[B] {
+private[resolvable] final case class AlternativeResolvable[A, B >: A](m1: Resolvable[A], m2: Resolvable[B]) extends Resolvable[B] {
   val manager = m1.manager
   // TODO: concatenate failures
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = m1.resolve(endpoints) map {
@@ -113,12 +113,12 @@ private[needs] final case class AlternativeResolvable[A, B >: A](m1: Resolvable[
   }
 }
 
-private[needs] final case class PureResolvable[A](a: A) extends Resolvable[A] {
+private[resolvable] final case class PureResolvable[A](a: A) extends Resolvable[A] {
   val manager = EndpointPoolManager.none
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful(Resolution.Result(a))
 }
 
-private[needs] final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable[A]) extends Resolvable[B] {
+private[resolvable] final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B], ma: Resolvable[A]) extends Resolvable[B] {
   val manager = mf.manager + ma.manager
 
   def tryFuture[X](f: Future[X])(implicit ec: ExecutionContext) =
@@ -142,7 +142,7 @@ private[needs] final case class AppliedResolvable[A, B](mf: Resolvable[A ⇒ B],
   }
 }
 
-private[needs] final case class FutureResolvable[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) extends Resolvable[A] {
+private[resolvable] final case class FutureResolvable[A](in: ExecutionContext ⇒ Future[Resolvable[A]]) extends Resolvable[A] {
   val manager = EndpointPoolManager.future(implicit ec ⇒ in(ec).map(_.manager).recover {
     case NonFatal(_) ⇒ EndpointPoolManager.none
   })
@@ -150,7 +150,7 @@ private[needs] final case class FutureResolvable[A](in: ExecutionContext ⇒ Fut
 }
 
 // TODO: use CanBuildFrom to generalize to traversables?
-private[needs] final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[List[A]] {
+private[resolvable] final case class ListResolvable[A](in: List[Resolvable[A]]) extends Resolvable[List[A]] {
   val manager = EndpointPoolManager.compose(in.map(_.manager))
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = async {
     val points = await(manager.process(endpoints))
@@ -160,13 +160,13 @@ private[needs] final case class ListResolvable[A](in: List[Resolvable[A]]) exten
   }
 }
 
-private[needs] final case class OptionResolvable[A](in: Option[Resolvable[A]]) extends Resolvable[Option[A]] {
+private[resolvable] final case class OptionResolvable[A](in: Option[Resolvable[A]]) extends Resolvable[Option[A]] {
   val manager = in.map(_.manager).getOrElse(EndpointPoolManager.none)
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) =
     in.map(_.resolve(endpoints).map(_.map(Some.apply))).getOrElse(Future.successful(Resolution.Result(None)))
 }
 
-private[needs] final case class DeferredResolvable[A](in: Resolvable[A]) extends Resolvable[Future[A]] {
+private[resolvable] final case class DeferredResolvable[A](in: Resolvable[A]) extends Resolvable[Future[A]] {
   val manager = in.manager
   def resolve(endpoints: EndpointPool)(implicit ec: ExecutionContext) = Future.successful {
     Resolution.Result(async {
@@ -238,20 +238,19 @@ object ResolvableMacros {
     import c.universe._
     val reader = newTermName(c.fresh("reader"))
     val tupled = scala.util.Try {
-      c.typeCheck(q"{ $reader: play.api.data.mapping.Reader[${weakTypeOf[I]}] ⇒ import play.api.libs.functional.lifting._; $builder($reader).tupled.fmap(_.liftAll[org.needs.Resolvable]) }")
+      c.typeCheck(q"{ $reader: _root_.play.api.data.mapping.Reader[${weakTypeOf[I]}] ⇒ import _root_.play.api.libs.functional.lifting._; $builder($reader).tupled.fmap(_.liftAll[_root_.resolvable.Resolvable]) }")
     } getOrElse {
       c.abort(builder.tree.pos, "Builder expected")
     }
     val TypeRef(_, _, List(_, TypeRef(_, _, List(TypeRef(_, _, _), TypeRef(_, _, List(TypeRef(_, _, types))))))) = tupled.tpe
-    val args = types.map(_ ⇒ c.fresh("arg"))
-    val idents = args.map(a ⇒ Ident(a))
-    val sign = args zip types map { case (a, t) ⇒ q"val ${newTermName(a)}: $t"}
+    val args = types.map(_ ⇒ newTermName(c.fresh("arg")))
+    val sign = args zip types map { case (a, t) ⇒ q"val $a: $t"}
     val res = scala.util.Try {
-      val constructor = q"{ (..$sign) ⇒ ${weakTypeOf[O].typeSymbol.companionSymbol}.apply(..$idents) }.tupled"
-      c.typeCheck(q"{ $reader: play.api.data.mapping.Reader[${weakTypeOf[I]}] ⇒ $tupled($reader).fmap(_.map($constructor)) }")
+      val constructor = q"{ (..$sign) ⇒ ${weakTypeOf[O].typeSymbol.companionSymbol}.apply(..$args) }.tupled"
+      c.typeCheck(q"{ $reader: _root_.play.api.data.mapping.Reader[${weakTypeOf[I]}] ⇒ $tupled($reader).fmap(_.map($constructor)) }")
     } getOrElse {
       c.abort(c.enclosingPosition, s"Could not generate Rule[${weakTypeOf[I]}, Resolvable[${weakTypeOf[O]}]]")
     }
-    c.Expr[Rule[I, Resolvable[O]]](q"play.api.data.mapping.From[${weakTypeOf[I]}]($res)")
+    c.Expr[Rule[I, Resolvable[O]]](q"_root_.play.api.data.mapping.From[${weakTypeOf[I]}]($res)")
   }
 }

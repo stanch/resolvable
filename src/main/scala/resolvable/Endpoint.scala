@@ -1,4 +1,4 @@
-package org.needs
+package resolvable
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}

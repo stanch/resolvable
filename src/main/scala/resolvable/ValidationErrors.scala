@@ -1,4 +1,4 @@
-package org.needs
+package resolvable
 
 import play.api.data.mapping._
 
