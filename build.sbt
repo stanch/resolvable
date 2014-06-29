@@ -2,7 +2,7 @@ name := "resolvable"
 
 organization := "org.resolvable"
 
-version := "2.0.0-M5"
+version := "2.0.0-M6"
 
 licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
