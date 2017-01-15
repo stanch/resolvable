@@ -1,1 +1,1 @@
-Read the guide here: http://resolvable.github.io/
+Read the guide here: http://stanch.github.io/resolvable

@@ -1,0 +1,350 @@
+<!DOCTYPE HTML>
+<html lang="en-US">
+    <head prefix="og: http://ogp.me/ns# book: http://ogp.me/ns/book#">
+        
+        <meta charset="UTF-8">
+        <title>Lists, Options | Resolvable</title>
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="robots" content="index, follow">
+        <meta name="author" content="resolvable">
+        <meta name="description" content="This Scala library allows to fetch nested data like">
+        <meta name="keywords" content="gitbook,github" >
+        <meta name="generator" content="www.gitbook.io">
+
+        
+        <link rel="next" href="../recipes/Deferring.html" />
+        
+        
+        <link rel="prev" href="../recipes/Fallbacks.html" />
+        
+
+        <meta property="og:title" content="Lists, Options | Resolvable">
+        <meta property="og:site_name" content="Resolvable">
+        <meta property="og:type" content="book">
+        <meta property="og:locale" content="en_US">
+
+        <meta property="book:author" content="https://github.com/resolvable">
+        <meta property="book:tag" content="GitBook">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+        <link rel="shortcut icon" href="..\gitbook/images/favicon.ico" type="image/x-icon">
+        
+    </head>
+    <body>
+        
+        <link rel="stylesheet" href="..\gitbook/style.css">
+        
+        
+    <div class="book" data-github="resolvable/resolvable" data-level="4.2" data-basepath=".." data-revision="1397957509297">
+    <div class="book-header">
+    <!-- Actions Left -->
+    
+    <a href="https://github.com/resolvable/resolvable" target="_blank" class="btn pull-left"><i class="fa fa-github-alt"></i></a>
+    
+    <a href="#" class="btn pull-left toggle-summary"><i class="fa fa-align-justify"></i></a>
+    <a href="#" class="btn pull-left toggle-search"><i class="fa fa-search"></i></a>
+
+    <!-- Actions Right -->
+    <a href="#" target="_blank" class="btn pull-right" data-sharing="google-plus"><i class="fa fa-google-plus"></i></a>
+    <a href="#" target="_blank" class="btn pull-right" data-sharing="facebook"><i class="fa fa-facebook"></i></a>
+    <a href="#" target="_blank" class="btn pull-right" data-sharing="twitter"><i class="fa fa-twitter"></i></a>
+
+    
+    <a href="https://github.com/resolvable/resolvable/stargazers" target="_blank" class="btn pull-right count-star"><i class="fa fa-star-o"></i> Star (<span>-</span>)</a>
+    <a href="https://github.com/resolvable/resolvable/watchers" target="_blank" class="btn pull-right count-watch"><i class="fa fa-eye"></i> Watch (<span>-</span>)</a>
+    
+
+    <!-- Title -->
+    <h1><a href="../" >Resolvable</a></h1>
+</div>
+
+    <div class="book-summary">
+    <div class="book-search">
+        <input type="text" placeholder="Search" class="form-control" />
+    </div>
+    <ul class="summary">
+        
+        <li>
+            <a href="https://github.com/resolvable" target="blank">About the author</a>
+        </li>
+        <li>
+            <a href="https://github.com/resolvable/resolvable/issues" target="blank">Questions and Issues</a>
+        </li>
+        <li>
+            <a href="https://github.com/resolvable/resolvable/edit/master/recipes/ListsOptions.md" target="blank">Edit and Contribute</a>
+        </li>
+        <li class="divider"></li>
+        
+        <li data-level="0" data-path="index.html">
+            <a href="../"><i class="fa fa-check"></i> Introduction</a>
+        </li>
+        
+            <li  data-level="1" data-path="Tutorial.html">
+                
+                <a href="../Tutorial.html">
+                    <i class="fa fa-check"></i> <b>1.</b> Tutorial
+                </a>
+                
+                
+                <ul class="articles">
+                    
+                        <li  data-level="1.1" data-path="tutorial/Resolvables.html">
+                            
+                            <a href="../tutorial/Resolvables.html">
+                                <i class="fa fa-check"></i> <b>1.1.</b> Resolvables
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="1.2" data-path="tutorial/Endpoints.html">
+                            
+                            <a href="../tutorial/Endpoints.html">
+                                <i class="fa fa-check"></i> <b>1.2.</b> Endpoints
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="1.3" data-path="tutorial/Sources.html">
+                            
+                            <a href="../tutorial/Sources.html">
+                                <i class="fa fa-check"></i> <b>1.3.</b> Sources
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="1.4" data-path="tutorial/Deserialization.html">
+                            
+                            <a href="../tutorial/Deserialization.html">
+                                <i class="fa fa-check"></i> <b>1.4.</b> Deserialization
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="1.5" data-path="tutorial/WrappingUp.html">
+                            
+                            <a href="../tutorial/WrappingUp.html">
+                                <i class="fa fa-check"></i> <b>1.5.</b> Wrapping up
+                            </a>
+                            
+                        </li>
+                    
+                </ul>
+                
+            </li>
+        
+            <li  data-level="2" data-path="Installation.html">
+                
+                <a href="../Installation.html">
+                    <i class="fa fa-check"></i> <b>2.</b> Installation
+                </a>
+                
+                
+            </li>
+        
+            <li  data-level="3" data-path="Guide.html">
+                
+                <a href="../Guide.html">
+                    <i class="fa fa-check"></i> <b>3.</b> Guide
+                </a>
+                
+                
+                <ul class="articles">
+                    
+                        <li  data-level="3.1" data-path="guide/HowItWorks.html">
+                            
+                            <a href="../guide/HowItWorks.html">
+                                <i class="fa fa-check"></i> <b>3.1.</b> How it works
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="3.2" data-path="guide/DefiningEndpoints.html">
+                            
+                            <a href="../guide/DefiningEndpoints.html">
+                                <i class="fa fa-check"></i> <b>3.2.</b> Defining endpoints
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="3.3" data-path="guide/DefiningSources.html">
+                            
+                            <a href="../guide/DefiningSources.html">
+                                <i class="fa fa-check"></i> <b>3.3.</b> Defining sources
+                            </a>
+                            
+                        </li>
+                    
+                </ul>
+                
+            </li>
+        
+            <li  data-level="4" data-path="Recipes.html">
+                
+                <a href="../Recipes.html">
+                    <i class="fa fa-check"></i> <b>4.</b> Recipes
+                </a>
+                
+                
+                <ul class="articles">
+                    
+                        <li  data-level="4.1" data-path="recipes/Fallbacks.html">
+                            
+                            <a href="../recipes/Fallbacks.html">
+                                <i class="fa fa-check"></i> <b>4.1.</b> Fallbacks
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="4.2" data-path="recipes/ListsOptions.html">
+                            
+                            <a href="../recipes/ListsOptions.html">
+                                <i class="fa fa-check"></i> <b>4.2.</b> Lists, Options
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="4.3" data-path="recipes/Deferring.html">
+                            
+                            <a href="../recipes/Deferring.html">
+                                <i class="fa fa-check"></i> <b>4.3.</b> Deferring
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="4.4" data-path="recipes/Aggregated.html">
+                            
+                            <a href="../recipes/Aggregated.html">
+                                <i class="fa fa-check"></i> <b>4.4.</b> Aggregated requests
+                            </a>
+                            
+                        </li>
+                    
+                        <li  data-level="4.5" data-path="recipes/Compound.html">
+                            
+                            <a href="../recipes/Compound.html">
+                                <i class="fa fa-check"></i> <b>4.5.</b> Compound responses
+                            </a>
+                            
+                        </li>
+                    
+                </ul>
+                
+            </li>
+        
+    </ul>
+</div>
+
+    <div class="book-body">
+        <div class="body-inner">
+            <div class="page-wrapper" tabindex="-1">
+                <div class="book-progress">
+    <div class="bar">
+        <div class="inner" style="width: 82.3529411764706%;min-width: 76.47058823529412%;"></div>
+    </div>
+    <div class="chapters">
+    
+        <a href="../index.html" title="Introduction" class="chapter done new-chapter" data-progress="0" style="left: 0%;"></a>
+    
+        <a href="../Tutorial.html" title="Tutorial" class="chapter done new-chapter" data-progress="1" style="left: 5.882352941176471%;"></a>
+    
+        <a href="../tutorial/Resolvables.html" title="Resolvables" class="chapter done " data-progress="1.1" style="left: 11.764705882352942%;"></a>
+    
+        <a href="../tutorial/Endpoints.html" title="Endpoints" class="chapter done " data-progress="1.2" style="left: 17.647058823529413%;"></a>
+    
+        <a href="../tutorial/Sources.html" title="Sources" class="chapter done " data-progress="1.3" style="left: 23.529411764705884%;"></a>
+    
+        <a href="../tutorial/Deserialization.html" title="Deserialization" class="chapter done " data-progress="1.4" style="left: 29.41176470588235%;"></a>
+    
+        <a href="../tutorial/WrappingUp.html" title="Wrapping up" class="chapter done " data-progress="1.5" style="left: 35.294117647058826%;"></a>
+    
+        <a href="../Installation.html" title="Installation" class="chapter done new-chapter" data-progress="2" style="left: 41.1764705882353%;"></a>
+    
+        <a href="../Guide.html" title="Guide" class="chapter done new-chapter" data-progress="3" style="left: 47.05882352941177%;"></a>
+    
+        <a href="../guide/HowItWorks.html" title="How it works" class="chapter done " data-progress="3.1" style="left: 52.94117647058823%;"></a>
+    
+        <a href="../guide/DefiningEndpoints.html" title="Defining endpoints" class="chapter done " data-progress="3.2" style="left: 58.8235294117647%;"></a>
+    
+        <a href="../guide/DefiningSources.html" title="Defining sources" class="chapter done " data-progress="3.3" style="left: 64.70588235294117%;"></a>
+    
+        <a href="../Recipes.html" title="Recipes" class="chapter done new-chapter" data-progress="4" style="left: 70.58823529411765%;"></a>
+    
+        <a href="../recipes/Fallbacks.html" title="Fallbacks" class="chapter done " data-progress="4.1" style="left: 76.47058823529412%;"></a>
+    
+        <a href="../recipes/ListsOptions.html" title="Lists, Options" class="chapter done " data-progress="4.2" style="left: 82.3529411764706%;"></a>
+    
+        <a href="../recipes/Deferring.html" title="Deferring" class="chapter  " data-progress="4.3" style="left: 88.23529411764706%;"></a>
+    
+        <a href="../recipes/Aggregated.html" title="Aggregated requests" class="chapter  " data-progress="4.4" style="left: 94.11764705882354%;"></a>
+    
+        <a href="../recipes/Compound.html" title="Compound responses" class="chapter  " data-progress="4.5" style="left: 100%;"></a>
+    
+    </div>
+</div>
+
+                <div class="page-inner">
+                
+                    <section class="normal" id="section-gitbook_13">
+                    
+                        <h1 id="lists-and-options">Lists and Options</h1>
+<p>Sometimes we need more than one object. Here is how we can define a method to fetch several books efficiently:</p>
+<pre><code class="lang-scala"><span class="hljs-keyword">def</span> needBook(id: String) =
+  Source[Book].from(BookEndpoint(id))
+
+<span class="hljs-keyword">def</span> needBooks(ids: List[String]) =
+  Resolvable.fromList(ids.map(needBook))
+</code></pre>
+<p><code>Resolvable.fromList</code> also helps in deserialization: if a book has several authors, we can write:</p>
+<pre><code class="lang-scala"><span class="hljs-class"><span class="hljs-keyword">case</span> <span class="hljs-keyword">class</span> <span class="hljs-title">Book</span><span class="hljs-params">(id: String, title: String, authors: List[Author])</span></span>
+
+implicit <span class="hljs-keyword">val</span> bookRule = Resolvable.rule[JsValue, Book] { __ ⇒
+  (__ \ <span class="hljs-string">"id"</span>).read[String] and
+  (__ \ <span class="hljs-string">"title"</span>).read[Stirng] and
+  (__ \ <span class="hljs-string">"authorIds"</span>).read[List[String]]
+    .fmap(ids ⇒ ids.map(needAuthor))
+    .fmap(Resolvable.fromList)
+}
+</code></pre>
+<p>The same approach can be used with <code>Option</code>s:</p>
+<pre><code class="lang-scala"><span class="hljs-class"><span class="hljs-keyword">case</span> <span class="hljs-keyword">class</span> <span class="hljs-title">Author</span><span class="hljs-params">(id: String, name: String, pet: Option[Pet])</span></span>
+
+implicit <span class="hljs-keyword">val</span> authorRule = Resolvable.rule[JsValue, Author] { __ ⇒
+  (__ \ <span class="hljs-string">"id"</span>).read[String] and
+  (__ \ <span class="hljs-string">"name"</span>).read[Stirng] and
+  (__ \ <span class="hljs-string">"petId"</span>).read[Option[String]]
+    .fmap(maybeId ⇒ maybeId.map(needPet))
+    .fmap(Resolvable.fromOption)
+}
+</code></pre>
+
+                    
+                    </section>
+                
+                </div>
+            </div>
+        </div>
+
+        
+        <a href="../recipes/Fallbacks.html" class="navigation navigation-prev"><i class="fa fa-angle-left"></i></a>
+        
+        
+        <a href="../recipes/Deferring.html" class="navigation navigation-next"><i class="fa fa-angle-right"></i></a>
+        
+    </div>
+</div>
+
+        
+        <script type="text/javascript">(function(e,b){if(!b.__SV){var a,f,i,g;window.mixpanel=b;b._i=[];b.init=function(a,e,d){function f(b,h){var a=h.split(".");2==a.length&&(b=b[a[0]],h=a[1]);b[h]=function(){b.push([h].concat(Array.prototype.slice.call(arguments,0)))}}var c=b;"undefined"!==typeof d?c=b[d]=[]:d="mixpanel";c.people=c.people||[];c.toString=function(b){var a="mixpanel";"mixpanel"!==d&&(a+="."+d);b||(a+=" (stub)");return a};c.people.toString=function(){return c.toString(1)+".people (stub)"};i="disable track track_pageview track_links track_forms register register_once alias unregister identify name_tag set_config people.set people.set_once people.increment people.append people.track_charge people.clear_charges people.delete_user".split(" ");
+for(g=0;g<i.length;g++)f(c,i[g]);b._i.push([a,e,d])};b.__SV=1.2;a=e.createElement("script");a.type="text/javascript";a.async=!0;a.src=("https:"===e.location.protocol?"https:":"http:")+'//cdn.mxpnl.com/libs/mixpanel-2.2.min.js';f=e.getElementsByTagName("script")[0];f.parentNode.insertBefore(a,f)}})(document,window.mixpanel||[]);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-javascript.js"></script>
+        <script src="..\gitbook/jsrepl/jsrepl.js" id="jsrepl-script"></script>
+        <script src="..\gitbook/app.js"></script>
+        
+    </body>
+</html>
